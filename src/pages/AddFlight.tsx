@@ -88,29 +88,27 @@ export function AddFlight() {
     const nextStep = () => {
         // Validation Logic
         if (currentStepId === 'grade') {
-            const grade = parseFloat(formData.grade);
-            if (formData.grade === '' || isNaN(grade) || grade < 0 || grade > 10) {
-                // Allow "APTO" text check?? User said 0-10 validation.
-                // Re-reading: "nota que el número máximo sea 10 y el mínimo 0 y si no ponen nada, que no les deje ir al siguiente paso"
-                // Assuming "APTO" is still valid for some contexts? The previous code had APTO checks.
-                // Let's stick strictly to what was asked: 0-10, required.
-                // But wait, the app supports APTO?
-                // Let's check if it's a number. If not, check if it's a valid string like APTO?
-                // User requirement: "en nota que el número máximo sea 10 y el mínimo 0 y si no ponen nada, que no les deje"
-                // This implies numeric input. 
-                // However, I see "APTO" logic elsewhere. I should probably allow it if it's text, but enforce number range if number.
-
-                const isNumeric = !isNaN(parseFloat(formData.grade));
-                if (formData.grade.trim() === '') {
-                    alert("Debes introducir una calificación.");
+            // VPRA Logic: Check for string presence
+            if (formData.sessionType === 'VPRA') {
+                if (!formData.grade) {
+                    alert("Debes seleccionar una calificación (APTO / NO APTO / NO EVALUABLE).");
                     return;
                 }
-                if (isNumeric) {
-                    if (grade < 0 || grade > 10) {
-                        alert("La nota debe estar entre 0 y 10.");
-                        return;
-                    }
-                }
+                setCurrentStep(prev => prev + 1);
+                return;
+            }
+
+            // Standard Numeric Logic
+            // Ensure checked against string because "0" is falsy but valid
+            if (formData.grade === '' || formData.grade === undefined) {
+                alert("Debes introducir una calificación.");
+                return;
+            }
+
+            const grade = parseFloat(formData.grade);
+            if (isNaN(grade) || grade < 0 || grade > 10) {
+                alert("La nota debe estar entre 0 y 10.");
+                return;
             }
         }
 
@@ -245,7 +243,7 @@ export function AddFlight() {
             // If the Master has a sheet PER STUDENT, then that makes sense.
             // Anyway, I will stick EXACTLY to the requested columns.
 
-            await fetch('https://script.google.com/macros/s/AKfycbwBFl80RYqIzSQvgeoNqWXsM7Rr1jGUZV7BND9gGZqvT3nwMH31972M0-yk2IeZLe94/exec', {
+            await fetch('https://script.google.com/macros/s/AKfycbyYL5059jqxE6ShBGzhzLI_Cam3j96CV5yaUHCjjogkJSWbXNuOXO9GJZgZll9JXybQ/exec', {
                 method: 'POST',
                 body: formDataToSend,
                 mode: 'no-cors' // Creating opaque request to avoid CORS issues with GAS
@@ -371,22 +369,79 @@ export function AddFlight() {
                     </div>
                 );
             case 'grade':
-                return (
-                    <div className="space-y-4">
-                        <Input
-                            label="Calificación / Nota"
-                            name="grade"
-                            value={formData.grade}
-                            onChange={handleChange}
-                            placeholder="0-10 o APTO"
-                            className="text-lg py-6 font-mono"
-                            autoFocus
-                        />
-                        {(!isNaN(parseFloat(formData.grade)) && parseFloat(formData.grade) < 5) && (
-                            <div className="p-4 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-center font-bold">
-                                NO APTO
+                // VPRA Session Logic: Restricted Select
+                if (formData.sessionType === 'VPRA') {
+                    return (
+                        <div className="space-y-4">
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                                Calificación VPRA
+                            </label>
+                            <div className="grid grid-cols-1 gap-3">
+                                {['APTO', 'NO APTO', 'NO EVALUABLE'].map((option) => (
+                                    <button
+                                        key={option}
+                                        onClick={() => setFormData(prev => ({ ...prev, grade: option }))}
+                                        className={`p-4 rounded-lg border-2 text-lg font-bold transition-all ${formData.grade === option
+                                            ? option === 'NO APTO'
+                                                ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                                : 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                            : 'border-zinc-200 bg-white hover:border-blue-300 dark:border-zinc-700 dark:bg-zinc-800'
+                                            }`}
+                                    >
+                                        {option}
+                                    </button>
+                                ))}
                             </div>
-                        )}
+                        </div>
+                    );
+                }
+
+                // Standard Logic: Slider 0-10 (Step 0.5)
+                return (
+                    <div className="space-y-8 py-4">
+                        <div className="text-center">
+                            <label className="block text-sm font-medium text-zinc-500 mb-4">
+                                Desliza para calificar
+                            </label>
+                            <div className={`text-6xl font-bold font-mono transition-colors ${!formData.grade ? 'text-zinc-300' : parseFloat(formData.grade) < 5 ? 'text-red-500' : 'text-blue-600'
+                                }`}>
+                                {formData.grade || '0'}
+                            </div>
+                            <div className="text-sm font-medium text-zinc-400 mt-2">
+                                {formData.grade ? (parseFloat(formData.grade) < 5 ? 'NO APTO' : 'APTO') : 'Selecciona nota'}
+                            </div>
+                        </div>
+
+                        <div className="px-2">
+                            <input
+                                type="range"
+                                min="0"
+                                max="10"
+                                step="0.5"
+                                value={formData.grade || 0}
+                                onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))}
+                                className="w-full h-3 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-blue-600"
+                            />
+                            <div className="flex justify-between text-xs text-zinc-400 mt-2 font-mono">
+                                <span>0</span>
+                                <span>2.5</span>
+                                <span>5</span>
+                                <span>7.5</span>
+                                <span>10</span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-2 mt-4">
+                            {[5, 6, 7, 8].map(quickVal => (
+                                <button
+                                    key={quickVal}
+                                    onClick={() => setFormData(prev => ({ ...prev, grade: String(quickVal) }))}
+                                    className="py-2 px-1 text-sm bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 rounded font-mono text-zinc-500"
+                                >
+                                    {quickVal}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 );
             case 'date':

@@ -41,7 +41,7 @@ export function StudentDetail() {
                 let logNameClean = removeAccents(l.studentName.trim());
                 return logNameClean === targetNameClean;
             })
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
         setLogs(studentLogs);
     };
@@ -230,11 +230,17 @@ export function StudentDetail() {
                                         <div>
                                             <div className="font-bold text-lg flex items-center gap-2">
                                                 {log.session}
-                                                <span className="text-xs font-normal text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
-                                                    {format(new Date(log.date), 'dd MMM yyyy')}
+                                                <span className="text-xs font-semibold text-zinc-500">
+                                                    {(() => {
+                                                        try {
+                                                            return format(new Date(log.date), 'dd/MM/yyyy');
+                                                        } catch {
+                                                            return log.date;
+                                                        }
+                                                    })()}
                                                 </span>
                                             </div>
-                                            <div className="text-sm text-zinc-500">{log.instructorName} • {log.aircraft.registration}</div>
+                                            <div className="text-sm text-zinc-500"><span className="font-medium text-zinc-700 dark:text-zinc-300">{log.aircraft?.registration || 'N/A'}</span> • {log.instructorName}</div>
                                         </div>
                                         <div className={`text-xl font-bold ${(parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
                                             ? 'text-green-600'
