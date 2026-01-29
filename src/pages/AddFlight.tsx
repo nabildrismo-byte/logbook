@@ -7,7 +7,7 @@ import { Select } from '@/components/ui/Select'
 import { storageService } from '@/services/storage'
 import { authService } from '@/services/auth'
 import { FlightLog, ApproachType, FlightType } from '@/types'
-import { INSTRUCTORS, STUDENTS, AIRCRAFT_REGISTRATIONS, SESSION_TYPES, FLIGHT_TYPES, AIRPORT_CODES } from '@/lib/constants'
+import { INSTRUCTORS, STUDENTS, AIRCRAFT_REGISTRATIONS, SESSION_TYPES, SESSION_NUMBERS, FLIGHT_TYPES, AIRPORT_CODES } from '@/lib/constants'
 import { ChevronRight, ChevronLeft, Save } from 'lucide-react'
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -23,21 +23,21 @@ export function AddFlight() {
     // Default Form State
     const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
-        studentName: '',
+        studentName: STUDENTS[0] || '',
         flightType: 'Real' as FlightType,
         sessionType: SESSION_TYPES[0],
         sessionNumber: '1',
         grade: '',
 
-        // Auto-filled if instructor
-        instructorName: user?.role === 'instructor' ? user.name : '',
+        // Auto-filled if instructor, else default to first instructor (for Admin)
+        instructorName: user?.role === 'instructor' ? user.name : (INSTRUCTORS[0] || ''),
 
         aircraftReg: AIRCRAFT_REGISTRATIONS[0],
         aircraftType: 'Heli',
 
-        depPlace: 'Base Aérea Armilla',
+        depPlace: 'LECV',
         // depTime removed
-        arrPlace: 'Base Aérea Armilla',
+        arrPlace: 'LECV',
         // arrTime removed
 
         // Only Total Time
@@ -45,9 +45,13 @@ export function AddFlight() {
 
         // Removed splits: pic, dual, ifr, hood...
 
-        approachesCount: 0,
-        approachType: 'ILS' as ApproachType,
-        approachPlace: 'LEGR',
+        // Approaches List State
+        approaches: [] as { type: ApproachType, count: number, place: string }[],
+
+        // Temp state for adding deeper approach
+        tempApproachType: 'ILS' as ApproachType,
+        tempApproachCount: 1,
+        tempApproachPlace: 'LECV',
 
         // Removed Zone
         procedures: '',
@@ -83,20 +87,79 @@ export function AddFlight() {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const nextStep = () => setCurrentStep(prev => prev + 1);
+    const nextStep = () => {
+        // Validation Logic
+        if (currentStepId === 'grade') {
+            const grade = parseFloat(formData.grade);
+            if (formData.grade === '' || isNaN(grade) || grade < 0 || grade > 10) {
+                // Allow "APTO" text check?? User said 0-10 validation.
+                // Re-reading: "nota que el número máximo sea 10 y el mínimo 0 y si no ponen nada, que no les deje ir al siguiente paso"
+                // Assuming "APTO" is still valid for some contexts? The previous code had APTO checks.
+                // Let's stick strictly to what was asked: 0-10, required.
+                // But wait, the app supports APTO?
+                // Let's check if it's a number. If not, check if it's a valid string like APTO?
+                // User requirement: "en nota que el número máximo sea 10 y el mínimo 0 y si no ponen nada, que no les deje"
+                // This implies numeric input. 
+                // However, I see "APTO" logic elsewhere. I should probably allow it if it's text, but enforce number range if number.
+
+                const isNumeric = !isNaN(parseFloat(formData.grade));
+                if (formData.grade.trim() === '') {
+                    alert("Debes introducir una calificación.");
+                    return;
+                }
+                if (isNumeric) {
+                    if (grade < 0 || grade > 10) {
+                        alert("La nota debe estar entre 0 y 10.");
+                        return;
+                    }
+                }
+            }
+        }
+
+        if (currentStepId === 'time') {
+            if (!formData.totalHours || parseFloat(formData.totalHours) <= 0) {
+                alert("Debes introducir el tiempo de vuelo.");
+                return;
+            }
+        }
+
+        setCurrentStep(prev => prev + 1);
+    };
     const prevStep = () => setCurrentStep(prev => prev - 1);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         if (!user) return;
+
+        // FORCE INSTRUCTOR NAME RESOLUTION
+        // If user is instructor, ALWAYS use their auth name, ignoring form state to prevent glitches
+        let finalInstructorName = formData.instructorName;
+        if (user.role === 'instructor') {
+            finalInstructorName = user.name;
+        }
+
+        // Final Validation
+        if (!finalInstructorName || finalInstructorName.trim() === '') {
+            alert("Error CRÍTICO: No se ha identificado el instructor. Cierra sesión e inicia intetalo de nuevo.");
+            return;
+        }
+
+        if (!formData.studentName.trim()) {
+            alert("Error: Debes seleccionar un alumno.");
+            return;
+        }
+
         setLoading(true);
+
+        const safeStudentName = formData.studentName.trim().normalize('NFC');
+        const safeInstructorName = finalInstructorName.trim().normalize('NFC');
 
         const newLog: FlightLog = {
             id: generateId(),
             date: formData.date,
-            instructorId: user.id,
-            instructorName: formData.instructorName,
-            studentName: formData.studentName,
+            instructorId: user.id, // Only relevant for who *created* the log.
+            instructorName: safeInstructorName,
+            studentName: safeStudentName,
             flightType: formData.flightType,
             session: `${formData.sessionType}-${formData.sessionNumber}`,
             grade: formData.grade,
@@ -123,11 +186,7 @@ export function AddFlight() {
             },
             conditions: {}, // No detailed splits
 
-            approaches: Number(formData.approachesCount) > 0 ? [{
-                type: formData.approachType,
-                count: Number(formData.approachesCount),
-                place: formData.approachPlace
-            }] : [],
+            approaches: formData.approaches,
 
             procedures: formData.procedures,
             remarks: formData.remarks,
@@ -157,10 +216,10 @@ export function AddFlight() {
             const formattedDate = `${d}/${m}/${y}`;
 
             // Add ALUMNO as first column
-            formDataToSend.append('ALUMNO', formData.studentName);
+            formDataToSend.append('ALUMNO', safeStudentName);
             formDataToSend.append('SESIÓN', `${formData.sessionType}-${formData.sessionNumber}`);
             formDataToSend.append('FECHA', formattedDate);
-            formDataToSend.append('INSTRUCTOR', formData.instructorName);
+            formDataToSend.append('INSTRUCTOR', safeInstructorName);
             formDataToSend.append('MATRÍCULA', formData.aircraftReg);
             formDataToSend.append('TIEMPO', formData.totalHours); // Send raw decimal hours as requested
             formDataToSend.append('REAL / SIM', realSim);
@@ -201,9 +260,10 @@ export function AddFlight() {
                 depPlace: 'Base Aérea Armilla',
                 arrPlace: 'Base Aérea Armilla',
                 totalHours: '',
-                approachesCount: 0,
-                approachType: 'ILS',
-                approachPlace: 'LEGR',
+                approaches: [],
+                tempApproachType: 'ILS',
+                tempApproachCount: 1,
+                tempApproachPlace: 'LECV',
                 procedures: '',
                 remarks: '',
             });
@@ -245,7 +305,7 @@ export function AddFlight() {
         { id: 'aircraft', title: 'Aeronave' },
         { id: 'route', title: 'Ruta' },
         { id: 'time', title: 'Tiempo' },
-        { id: 'approaches', title: 'Aproximaciones' },
+        { id: 'approaches', title: 'Maniobras IFR' },
         { id: 'details', title: 'Detalles' },
     ];
 
@@ -293,14 +353,13 @@ export function AddFlight() {
                             options={SESSION_TYPES.map(s => ({ label: s, value: s }))}
                             className="text-lg py-3"
                         />
-                        <Input
+                        <Select
                             label="Número de Sesión"
                             name="sessionNumber"
-                            type="number"
                             value={formData.sessionNumber}
                             onChange={handleChange}
-                            placeholder="1"
-                            className="text-lg py-6"
+                            options={SESSION_NUMBERS.map(n => ({ label: n, value: n }))}
+                            className="text-lg py-3"
                         />
                     </div>
                 );
@@ -409,40 +468,96 @@ export function AddFlight() {
             case 'approaches':
                 return (
                     <div className="space-y-6">
-                        <div className="grid grid-cols-[1fr_100px] gap-4">
-                            <Select
-                                label="Tipo Aprox."
-                                name="approachType"
-                                value={formData.approachType}
-                                onChange={handleChange}
-                                options={[
-                                    { label: 'ILS', value: 'ILS' },
-                                    { label: 'VOR', value: 'VOR' },
-                                    { label: 'NDB', value: 'NDB' },
-                                    { label: 'RNP', value: 'RNP' },
-                                    { label: 'LOC', value: 'LOC' },
-                                    { label: 'PAR', value: 'PAR' },
-                                    { label: 'TACAN', value: 'TACAN' },
-                                ]}
-                                className="text-lg py-3"
-                            />
-                            <Input
-                                label="Cantidad"
-                                type="number"
-                                name="approachesCount"
-                                value={formData.approachesCount || ''}
-                                onChange={handleChange}
-                                className="text-lg py-6 text-center"
-                            />
+                        {/* List of added approaches */}
+                        {formData.approaches.length > 0 && (
+                            <div className="space-y-2 mb-4">
+                                <label className="text-sm font-medium text-zinc-500">Maniobras Añadidas:</label>
+                                {formData.approaches.map((app, idx) => (
+                                    <div key={idx} className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded border border-zinc-200 dark:border-zinc-700">
+                                        <span className="font-mono text-sm">
+                                            {app.count}x {app.type} @ {app.place}
+                                        </span>
+                                        <button
+                                            onClick={() => {
+                                                const newApps = [...formData.approaches];
+                                                newApps.splice(idx, 1);
+                                                setFormData({ ...formData, approaches: newApps });
+                                            }}
+                                            className="text-red-500 text-xs hover:underline"
+                                        >
+                                            Eliminar
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="border-t pt-4">
+                            <label className="text-sm font-medium mb-2 block">Nueva Maniobra</label>
+                            <div className="grid grid-cols-[1fr_80px] gap-3 mb-3">
+                                <Select
+                                    label="Tipo"
+                                    name="tempApproachType"
+                                    value={formData.tempApproachType}
+                                    onChange={handleChange}
+                                    options={[
+                                        { label: 'ILS', value: 'ILS' },
+                                        { label: 'VOR', value: 'VOR' },
+                                        { label: 'NDB', value: 'NDB' },
+                                        { label: 'RNP', value: 'RNP' },
+                                        { label: 'LOC', value: 'LOC' },
+                                        { label: 'PAR', value: 'PAR' },
+                                        { label: 'TACAN', value: 'TACAN' },
+                                        { label: 'NMS', value: 'NMS' },
+                                        { label: 'SID', value: 'SID' },
+                                        { label: 'STAR', value: 'STAR' },
+                                    ]}
+                                    className="text-lg py-2"
+                                />
+                                <Input
+                                    label="Cant."
+                                    type="number"
+                                    name="tempApproachCount"
+                                    value={formData.tempApproachCount}
+                                    onChange={handleChange}
+                                    className="text-lg py-5 text-center"
+                                />
+                            </div>
+                            <div className="flex gap-3">
+                                <Input
+                                    label="Lugar"
+                                    name="tempApproachPlace"
+                                    value={formData.tempApproachPlace}
+                                    onChange={handleChange}
+                                    list="airport-codes"
+                                    className="text-lg py-5 uppercase flex-1"
+                                />
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        if (formData.tempApproachCount > 0) {
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                approaches: [
+                                                    ...prev.approaches,
+                                                    {
+                                                        type: prev.tempApproachType,
+                                                        count: Number(prev.tempApproachCount),
+                                                        place: prev.tempApproachPlace
+                                                    }
+                                                ],
+                                                // Reset temp defaults
+                                                tempApproachCount: 1,
+                                                tempApproachPlace: 'LECV' // Keep default or reset? User asked for default.
+                                            }));
+                                        }
+                                    }}
+                                    className="h-auto bg-blue-600 hover:bg-blue-700 text-white"
+                                >
+                                    Añadir
+                                </Button>
+                            </div>
                         </div>
-                        <Input
-                            label="Lugar (Opcional)"
-                            name="approachPlace"
-                            value={formData.approachPlace}
-                            onChange={handleChange}
-                            list="airport-codes"
-                            className="text-lg py-6 uppercase"
-                        />
                     </div>
                 );
             case 'details':

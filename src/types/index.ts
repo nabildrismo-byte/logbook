@@ -1,6 +1,6 @@
 export type FlightRule = 'VFR' | 'IFR' | 'SVFR';
 export type PilotFunction = 'PIC' | 'Dual' | 'Instructor';
-export type ApproachType = 'ILS' | 'VOR' | 'NDB' | 'RNP' | 'LOC' | 'PAR' | 'TACAN';
+export type ApproachType = 'ILS' | 'VOR' | 'NDB' | 'RNP' | 'LOC' | 'PAR' | 'TACAN' | 'NMS' | 'SID' | 'STAR';
 export type UserRole = 'admin' | 'instructor';
 export type FlightType = 'Real' | 'Entrenador' | 'Simulador';
 

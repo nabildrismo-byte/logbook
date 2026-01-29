@@ -9,7 +9,7 @@ export const INSTRUCTORS = [
 ];
 
 export const STUDENTS = [
-    'EXPÓSITO',
+    'EXPOSITO',
     'MELLADO',
     'PACHON',
     'ESPINOSA',
@@ -25,19 +25,13 @@ export const STUDENTS = [
 ];
 
 export const AIRCRAFT_REGISTRATIONS = [
-    'ET-183',
-    'ET-186',
-    'ET-105',
-    'ET-184',
-    'ET-106',
-    'ET-189'
+    ...Array.from({ length: 14 }, (_, i) => `ET-${180 + i}`)
 ];
 
 export const SESSION_TYPES = [
     'VBAS',
-    'VPRA',
-    'RAD',
-    'NAV'
+    'VRAD',
+    'VPRA'
 ];
 
 export const ZONES = [
@@ -58,6 +52,11 @@ export const FLIGHT_TYPES = [
     'Real',
     'Entrenador',
     'Simulador'
+];
+
+export const SESSION_NUMBERS = [
+    ...Array.from({ length: 20 }, (_, i) => String(i + 1)),
+    ...Array.from({ length: 10 }, (_, i) => `INCID-${i + 1}`)
 ];
 
 export const AIRPORT_CODES = [

@@ -20,14 +20,27 @@ export function StudentDetail() {
             return;
         }
         if (name) {
-            loadStudentData(decodeURIComponent(name));
+            loadStudentData(name);
         }
     }, [name, user, navigate]);
 
-    const loadStudentData = (studentName: string) => {
+    const loadStudentData = (studentNameEncoded: string) => {
+        let studentName = studentNameEncoded;
+        try {
+            studentName = decodeURIComponent(studentNameEncoded);
+        } catch (e) {
+            console.error('Error decoding student name:', e);
+        }
+
+        const removeAccents = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+        const targetNameClean = removeAccents(studentName);
+
         const allLogs = storageService.getLogs();
         const studentLogs = allLogs
-            .filter(l => l.studentName.trim() === studentName)
+            .filter(l => {
+                let logNameClean = removeAccents(l.studentName.trim());
+                return logNameClean === targetNameClean;
+            })
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         setLogs(studentLogs);
@@ -37,7 +50,14 @@ export function StudentDetail() {
         return (minutes / 60).toFixed(1).replace('.', ',');
     };
 
-    if (!logs.length) return <div className="p-4">Cargando datos del alumno...</div>;
+    if (!logs.length) {
+        return (
+            <div className="p-8 text-center bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <div className="text-zinc-500 mb-2">No se encontraron vuelos para este alumno.</div>
+                <div className="text-sm text-zinc-400">Nombre buscado: {name ? decodeURIComponent(name) : 'Desconocido'}</div>
+            </div>
+        );
+    }
 
     // Stats calculation
     const totalMinutes = logs.reduce((acc, log) => acc + (log.totalTime || 0), 0);
@@ -62,13 +82,22 @@ export function StudentDetail() {
 
     const failedCount = logs.length - passedCount;
 
+    const getDecodedName = () => {
+        try {
+            return decodeURIComponent(name || '');
+        } catch {
+            return name || '';
+        }
+    }
+    const displayName = getDecodedName();
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-1">
                 <div className="flex justify-between items-start">
                     <div>
                         <h2 className="text-sm font-medium text-zinc-500 uppercase tracking-wider">Expediente del Alumno</h2>
-                        <h1 className="text-3xl font-bold">{decodeURIComponent(name || '')}</h1>
+                        <h1 className="text-3xl font-bold">{displayName}</h1>
                     </div>
                 </div>
             </div>
@@ -130,6 +159,56 @@ export function StudentDetail() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* MANEUVERS BREAKDOWN */}
+            {logs.some(l => l.approaches && l.approaches.length > 0) && (
+                <Card>
+                    <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 p-1.5 rounded-md">
+                                IFR
+                            </span>
+                            Desglose de Maniobras
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-2">
+                        <div className="space-y-1">
+                            {(() => {
+                                const stats: Record<string, { type: string, place: string, count: number }> = {};
+                                logs.forEach(log => {
+                                    if (log.approaches) {
+                                        log.approaches.forEach(app => {
+                                            const key = `${app.type}-${app.place || 'UNK'}`;
+                                            if (!stats[key]) {
+                                                stats[key] = {
+                                                    type: app.type,
+                                                    place: app.place || 'N/A',
+                                                    count: 0
+                                                };
+                                            }
+                                            stats[key].count += app.count;
+                                        });
+                                    }
+                                });
+
+                                return Object.values(stats)
+                                    .sort((a, b) => b.count - a.count)
+                                    .map((stat, idx) => (
+                                        <div key={idx} className="flex justify-between items-center text-sm border-b border-dashed border-zinc-100 dark:border-zinc-800 last:border-0 py-2">
+                                            <div className="flex gap-2">
+                                                <span className="font-bold w-12">{stat.type}</span>
+                                                <span className="text-zinc-500">en {stat.place}</span>
+                                            </div>
+                                            <span className="font-mono font-bold bg-zinc-100 dark:bg-zinc-800 px-2 rounded-full">
+                                                {stat.count}
+                                            </span>
+                                        </div>
+                                    ));
+                            })()}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* FLIGHT HISTORY LIST */}
             <div>

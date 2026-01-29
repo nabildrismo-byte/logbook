@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { storageService } from '@/services/storage'
 import { authService } from '@/services/auth'
 import { FlightLog } from '@/types'
+import { STUDENTS } from '@/lib/constants'
 import { Users, ChevronRight, GraduationCap } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -30,16 +31,41 @@ export function Students() {
 
     const loadData = () => {
         const logs = storageService.getLogs();
+
+        // Map Canonical Name -> Logs
         const studentMap = new Map<string, FlightLog[]>();
 
-        // Group by student
+        const removeAccents = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
+        // Initialize map with all students from constants to ensure they appear even with 0 flights
+        const canonicalNames = STUDENTS;
+        canonicalNames.forEach(name => {
+            studentMap.set(name, []);
+        });
+
         logs.forEach(log => {
-            const name = log.studentName.trim();
-            if (!name) return;
-            if (!studentMap.has(name)) {
-                studentMap.set(name, []);
+            if (!log.studentName) return;
+
+            // Normalize both log name and canonical names by stripping accents entirely
+            let logNameClean = removeAccents(log.studentName.trim());
+
+            // Try to find a matching canonical name
+            let matchedName = log.studentName; // Default to original if no match (or mapped one)
+
+            // Update match logic to handle the clean version
+            const foundCanonical = canonicalNames.find(c => {
+                const cClean = removeAccents(c);
+                return cClean === logNameClean;
+            });
+
+            if (foundCanonical) {
+                matchedName = foundCanonical;
             }
-            studentMap.get(name)?.push(log);
+
+            if (!studentMap.has(matchedName)) {
+                studentMap.set(matchedName, []);
+            }
+            studentMap.get(matchedName)?.push(log);
         });
 
         // Calculate stats
@@ -59,12 +85,15 @@ export function Students() {
             // Sort by date for last flight
             studentLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+            const lastLog = studentLogs.length > 0 ? studentLogs[0] : null;
+
             summaries.push({
                 name,
                 totalTime,
                 flightCount: studentLogs.length,
                 averageGrade: avgGrade,
-                lastFlight: studentLogs[0].date
+                // If no flights, use empty string or handled in UI
+                lastFlight: lastLog ? lastLog.date : ''
             });
         });
 
@@ -111,7 +140,7 @@ export function Students() {
                                                 {student.averageGrade.toFixed(1)}
                                             </div>
                                             <div className="text-[10px] text-zinc-400">
-                                                Último: {format(new Date(student.lastFlight), 'dd/MM/yy')}
+                                                Último: {student.lastFlight ? format(new Date(student.lastFlight), 'dd/MM/yy') : '-'}
                                             </div>
                                         </div>
                                         <ChevronRight className="h-5 w-5 text-zinc-300" />

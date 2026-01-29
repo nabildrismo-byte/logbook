@@ -53,7 +53,10 @@ export function Login() {
                             Entrar
                         </Button>
 
-
+                        <div className="mt-8 text-center text-xs text-zinc-400">
+                            <p>© Desarrollado por Capitán DRIS</p>
+                            <p className="mt-1">Versión Beta 0.1.2</p>
+                        </div>
                     </form>
                 </CardContent>
             </Card>
