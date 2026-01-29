@@ -1,25 +1,23 @@
 import { User } from '@/types';
-import { INSTRUCTORS } from '@/lib/constants';
+
 
 const USERS_KEY = 'heli_users_v1';
 const CURRENT_USER_KEY = 'heli_current_user_v1';
 
-// Seed initial users if empty
+// Seed initial users if empty or force update for v2 security
 const seedUsers = () => {
-    const existing = localStorage.getItem(USERS_KEY);
-    if (!existing) {
-        const users: User[] = [
-            { id: 'admin', username: 'admin', name: 'Jefe de Curso', role: 'admin', password: 'admin' },
-            ...INSTRUCTORS.map(inst => ({
-                id: inst.toLowerCase(),
-                username: inst.toLowerCase(),
-                name: inst,
-                role: 'instructor' as const,
-                password: '123' // Default password
-            }))
-        ];
-        localStorage.setItem(USERS_KEY, JSON.stringify(users));
-    }
+    // Passwords: 5 chars, letters + numbers
+    const users: User[] = [
+        { id: 'admin', username: 'admin', name: 'Jefe de Curso', role: 'admin', password: 'admin' },
+        { id: 'izquierdo', username: 'izquierdo', name: 'IZQUIERDO', role: 'instructor', password: 'zkq85' },
+        { id: 'dris', username: 'dris', name: 'DRIS', role: 'instructor', password: 'dr73s' },
+        { id: 'rodriguez', username: 'rodriguez', name: 'RODRIGUEZ', role: 'instructor', password: 'rdz92' },
+        { id: 'prieto', username: 'prieto', name: 'PRIETO', role: 'instructor', password: 'pr12t' },
+        { id: 'benjumea', username: 'benjumea', name: 'BENJUMEA', role: 'instructor', password: 'bnj47' },
+        { id: 'soriano', username: 'soriano', name: 'SORIANO', role: 'instructor', password: 'srn63' },
+        { id: 'duenas', username: 'dueñas', name: 'DUEÑAS', role: 'instructor', password: 'dn58s' },
+    ];
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
 };
 
 export const authService = {
@@ -30,7 +28,12 @@ export const authService = {
     login: (username: string, password: string): User | null => {
         authService.init();
         const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-        const user = users.find((u: User) => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
+
+        // Case insensitive match for both username and password
+        const user = users.find((u: User) =>
+            u.username.toLowerCase() === username.trim().toLowerCase() &&
+            (u.password || '').toLowerCase() === password.trim().toLowerCase()
+        );
 
         if (user) {
             const { password, ...safeUser } = user;

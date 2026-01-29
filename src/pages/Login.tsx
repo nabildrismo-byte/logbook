@@ -35,7 +35,7 @@ export function Login() {
                 <CardContent>
                     <form onSubmit={handleLogin} className="space-y-4">
                         <Input
-                            placeholder="Usuario (ej. DRIS)"
+                            placeholder="Usuario"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             autoCapitalize="none"
@@ -53,11 +53,7 @@ export function Login() {
                             Entrar
                         </Button>
 
-                        <div className="text-xs text-center text-zinc-400 mt-4">
-                            <p>Demo accounts:</p>
-                            <p>dris / 123</p>
-                            <p>admin / admin</p>
-                        </div>
+
                     </form>
                 </CardContent>
             </Card>

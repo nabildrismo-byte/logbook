@@ -1,12 +1,11 @@
 export const INSTRUCTORS = [
-    'SORIANO',
-    'RGUEZ A',
+    'IZQUIERDO',
+    'DRIS',
+    'RODRIGUEZ',
     'PRIETO',
     'BENJUMEA',
-    'IZQUIERDO',
-    'DUEÑAS',
-    'VICENTE',
-    'LEON'
+    'SORIANO',
+    'DUEÑAS'
 ];
 
 export const STUDENTS = [
