@@ -36,9 +36,7 @@ export function AddFlight() {
         aircraftType: 'Heli',
 
         depPlace: 'LECV',
-        // depTime removed
         arrPlace: 'LECV',
-        // arrTime removed
 
         // Only Total Time
         totalHours: '',
@@ -170,11 +168,9 @@ export function AddFlight() {
             },
             departure: {
                 place: formData.depPlace,
-                time: '' // Removed
             },
             arrival: {
                 place: formData.arrPlace,
-                time: '' // Removed
             },
 
             // Convert Hours to Minutes
@@ -226,6 +222,17 @@ export function AddFlight() {
             formDataToSend.append('PUNTUACIÓN', formData.grade);
             formDataToSend.append('OBSERVACIONES', formData.remarks);
 
+            // NEW FIELDS (Added at the end as requested)
+            formDataToSend.append('LUGAR SALIDA', formData.depPlace);
+            formDataToSend.append('LUGAR LLEGADA', formData.arrPlace);
+            formDataToSend.append('PROCEDIMIENTOS', formData.procedures);
+
+            // Format Approaches as string
+            const approachesString = formData.approaches
+                .map(a => `${a.count}x ${a.type} @ ${a.place}`)
+                .join(', ');
+            formDataToSend.append('MANIOBRAS', approachesString);
+
             // Add student name if needed, though column requirement didn't explicitly list it? 
             // User request: "[SESIÓN] [FECHA] [INSTRUCTOR] [MATRÍCULA] [TIEMPO] [REAL / SIM] [PUNTUACIÓN] [OBSERVACIONES]" 
             // NOTE: The user's list implies they filter by student in their own way or maybe I missed it. 
@@ -238,7 +245,7 @@ export function AddFlight() {
             // If the Master has a sheet PER STUDENT, then that makes sense.
             // Anyway, I will stick EXACTLY to the requested columns.
 
-            await fetch('https://script.google.com/macros/s/AKfycbznDJQ0cZH5b7VYDWFv7Q7C4g879RS2l4AIy-qTZvT0UheXKwY7uqUyGvv4bWnAzh6v/exec', {
+            await fetch('https://script.google.com/macros/s/AKfycbwBFl80RYqIzSQvgeoNqWXsM7Rr1jGUZV7BND9gGZqvT3nwMH31972M0-yk2IeZLe94/exec', {
                 method: 'POST',
                 body: formDataToSend,
                 mode: 'no-cors' // Creating opaque request to avoid CORS issues with GAS

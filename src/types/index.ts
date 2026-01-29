@@ -35,11 +35,9 @@ export interface FlightLog {
 
     departure: {
         place: string;
-        time: string;
     };
     arrival: {
         place: string;
-        time: string;
     };
 
     totalTime: number; // minutes
