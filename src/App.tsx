@@ -221,7 +221,7 @@ export function AddFlight() {
         .join(', ');
       formDataToSend.append('MANIOBRAS', approachesString);
 
-      await fetch('https://script.google.com/macros/s/AKfycbznDJQ0cZH5b7VYDWFv7Q7C4g879RS2l4AIy-qTZvT0UheXKwY7uqUyGvv4bWnAzh6v/exec', {
+      await fetch('https://script.google.com/macros/s/AKfycbxvaZj9L8xq52Jha_vV3ZGSuhgXkgToal1XM1nbLwkjOpBDSG06Y-vgXC0eTDoosQcN/exec', {
         method: 'POST',
         body: formDataToSend,
         mode: 'no-cors' // Creating opaque request to avoid CORS issues with GAS
