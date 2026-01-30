@@ -9,7 +9,7 @@ const CURRENT_USER_KEY = 'heli_current_user_v1';
 const seedUsers = () => {
     // Passwords: 5 chars, letters + numbers
     const users: User[] = [
-        { id: 'admin', username: 'admin', name: 'Jefe de Curso', role: 'admin', password: 'admin' },
+        { id: 'admin', username: 'admin', name: 'Jefe de Curso', role: 'admin', password: '12curso' },
         { id: 'izquierdo', username: 'izquierdo', name: 'IZQUIERDO', role: 'instructor', password: 'zkq85' },
         { id: 'dris', username: 'dris', name: 'DRIS', role: 'instructor', password: 'dr73s' },
         { id: 'rodriguez', username: 'rodriguez', name: 'RODRIGUEZ', role: 'instructor', password: 'rdz92' },
