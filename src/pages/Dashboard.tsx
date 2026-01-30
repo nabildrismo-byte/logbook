@@ -12,7 +12,10 @@ import { cn } from '@/lib/utils'
 export function Dashboard() {
     const navigate = useNavigate();
     const [stats, setStats] = useState<LogbookStats | null>(null);
+    const [page, setPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
     const [recentLogs, setRecentLogs] = useState<FlightLog[]>([]);
+    const [totalPages, setTotalPages] = useState(0);
     const user = authService.getCurrentUser();
 
     useEffect(() => {
@@ -21,11 +24,19 @@ export function Dashboard() {
             return;
         }
         loadData();
-    }, [user, navigate]);
+    }, [user, navigate, page]); // Reload when page changes
 
     const loadData = () => {
         setStats(storageService.getStats());
-        setRecentLogs(storageService.getLogs().slice(0, 10)); // Show last 10
+        const allLogs = storageService.getLogs();
+        // Sort by Date Descending (Newest first)
+        const sortedLogs = allLogs.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+
+        setTotalPages(Math.ceil(sortedLogs.length / ITEMS_PER_PAGE));
+
+        const start = (page - 1) * ITEMS_PER_PAGE;
+        const end = start + ITEMS_PER_PAGE;
+        setRecentLogs(sortedLogs.slice(start, end));
     };
 
     const formatDuration = (minutes: number) => {
@@ -118,15 +129,18 @@ export function Dashboard() {
             ) : (
                 <div className="space-y-3">
                     {recentLogs.map((log) => {
-                        // Check grade logic for color
+                        const gradeUpper = String(log.grade).toUpperCase();
+                        const isNoEvaluable = gradeUpper.includes('NO EVALUABLE');
                         const n = parseFloat(log.grade);
-                        const isPassing = !isNaN(n) ? n >= 5 : (String(log.grade).toUpperCase().includes('APTO') && !String(log.grade).toUpperCase().includes('NO'));
+                        const isPassing = !isNaN(n) ? n >= 5 : (gradeUpper.includes('APTO') && !gradeUpper.includes('NO'));
 
                         return (
                             <Card key={log.id} className="overflow-hidden">
                                 <div className="flex border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 p-2 px-4 justify-between items-center">
                                     <span className="text-xs font-semibold text-zinc-500">{format(new Date(log.date), 'dd/MM/yyyy')} — {log.session}</span>
-                                    {!isPassing ? (
+                                    {isNoEvaluable ? (
+                                        <span className="text-xs font-bold text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">{log.grade}</span>
+                                    ) : !isPassing ? (
                                         <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded-full">NO APTO ({log.grade})</span>
                                     ) : (
                                         <span className="text-xs font-bold text-green-600 bg-green-100 dark:bg-green-900/40 px-2 py-0.5 rounded-full">APTO ({log.grade})</span>
@@ -155,6 +169,27 @@ export function Dashboard() {
                             </Card>
                         );
                     })}
+
+                    {/* Pagination Controls */}
+                    <div className="flex justify-center gap-2 py-4">
+                        <button
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                            className="px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 disabled:opacity-50"
+                        >
+                            Anterior
+                        </button>
+                        <span className="px-4 py-2 text-sm font-medium">
+                            Página {page} de {totalPages || 1}
+                        </span>
+                        <button
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            disabled={page >= totalPages}
+                            className="px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 disabled:opacity-50"
+                        >
+                            Siguiente
+                        </button>
+                    </div>
                 </div>
             )}
 

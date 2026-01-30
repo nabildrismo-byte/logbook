@@ -24,6 +24,23 @@ export const STUDENTS = [
     'DE LAS MORAS'
 ];
 
+// Custom Sort Order requested by User
+export const ORDERED_STUDENT_NAMES = [
+    'CUADRADO',
+    'DE LAS MORAS',
+    'M.PEREZ',
+    'GUERRERO',
+    'TRUJILLO',
+    'ESPINOSA',
+    'CARRILLO',
+    'COMPTE',
+    'S.ALONSO',
+    'GAYO',
+    'MELLADO',
+    'EXPOSITO',
+    'PACHON'
+];
+
 export const AIRCRAFT_REGISTRATIONS = [
     ...Array.from({ length: 14 }, (_, i) => `ET-${180 + i}`)
 ];

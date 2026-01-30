@@ -221,13 +221,13 @@ export function AddFlight() {
             formDataToSend.append('OBSERVACIONES', formData.remarks);
 
             // NEW FIELDS (Added at the end as requested)
-            formDataToSend.append('LUGAR SALIDA', formData.depPlace);
-            formDataToSend.append('LUGAR LLEGADA', formData.arrPlace);
+            formDataToSend.append('LUGAR SALIDA', formData.depPlace.toUpperCase());
+            formDataToSend.append('LUGAR LLEGADA', formData.arrPlace.toUpperCase());
             formDataToSend.append('PROCEDIMIENTOS', formData.procedures);
 
             // Format Approaches as string
             const approachesString = formData.approaches
-                .map(a => `${a.count}x ${a.type} @ ${a.place}`)
+                .map(a => `${a.count}x ${a.type} @ ${a.place.toUpperCase()}`)
                 .join(', ');
             formDataToSend.append('MANIOBRAS', approachesString);
 
@@ -494,7 +494,7 @@ export function AddFlight() {
                         <Input
                             label="Lugar de Salida"
                             name="depPlace"
-                            value={formData.depPlace}
+                            value={formData.depPlace.toUpperCase()}
                             onChange={handleChange}
                             placeholder="Ej. GCXO"
                             list="airport-codes"
@@ -503,7 +503,7 @@ export function AddFlight() {
                         <Input
                             label="Lugar de Llegada"
                             name="arrPlace"
-                            value={formData.arrPlace}
+                            value={formData.arrPlace.toUpperCase()}
                             onChange={handleChange}
                             placeholder="Ej. GCLP"
                             list="airport-codes"
@@ -589,7 +589,7 @@ export function AddFlight() {
                                 <Input
                                     label="Lugar"
                                     name="tempApproachPlace"
-                                    value={formData.tempApproachPlace}
+                                    value={formData.tempApproachPlace.toUpperCase()}
                                     onChange={handleChange}
                                     list="airport-codes"
                                     className="text-lg py-5 uppercase flex-1"
@@ -605,7 +605,7 @@ export function AddFlight() {
                                                     {
                                                         type: prev.tempApproachType,
                                                         count: Number(prev.tempApproachCount),
-                                                        place: prev.tempApproachPlace
+                                                        place: prev.tempApproachPlace.toUpperCase()
                                                     }
                                                 ],
                                                 // Reset temp defaults

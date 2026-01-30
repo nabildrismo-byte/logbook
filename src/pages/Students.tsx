@@ -19,6 +19,7 @@ interface StudentSummary {
 export function Students() {
     const navigate = useNavigate();
     const [students, setStudents] = useState<StudentSummary[]>([]);
+    const [sortBy, setSortBy] = useState<'name' | 'grade' | 'hours'>('name');
     const user = authService.getCurrentUser();
 
     useEffect(() => {
@@ -27,7 +28,7 @@ export function Students() {
             return;
         }
         loadData();
-    }, [user, navigate]);
+    }, [user, navigate, sortBy]); // Reload when sort changes
 
     const loadData = () => {
         const logs = storageService.getLogs();
@@ -45,26 +46,17 @@ export function Students() {
 
         logs.forEach(log => {
             if (!log.studentName) return;
-
             // Normalize both log name and canonical names by stripping accents entirely
             let logNameClean = removeAccents(log.studentName.trim());
-
             // Try to find a matching canonical name
-            let matchedName = log.studentName; // Default to original if no match (or mapped one)
-
-            // Update match logic to handle the clean version
+            let matchedName = log.studentName;
             const foundCanonical = canonicalNames.find(c => {
                 const cClean = removeAccents(c);
                 return cClean === logNameClean;
             });
+            if (foundCanonical) matchedName = foundCanonical;
 
-            if (foundCanonical) {
-                matchedName = foundCanonical;
-            }
-
-            if (!studentMap.has(matchedName)) {
-                studentMap.set(matchedName, []);
-            }
+            if (!studentMap.has(matchedName)) studentMap.set(matchedName, []);
             studentMap.get(matchedName)?.push(log);
         });
 
@@ -84,7 +76,6 @@ export function Students() {
 
             // Sort by date for last flight
             studentLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
             const lastLog = studentLogs.length > 0 ? studentLogs[0] : null;
 
             summaries.push({
@@ -92,13 +83,18 @@ export function Students() {
                 totalTime,
                 flightCount: studentLogs.length,
                 averageGrade: avgGrade,
-                // If no flights, use empty string or handled in UI
                 lastFlight: lastLog ? lastLog.date : ''
             });
         });
 
-        // Sort alphabetically
-        summaries.sort((a, b) => a.name.localeCompare(b.name));
+        // Sort Logic
+        summaries.sort((a, b) => {
+            if (sortBy === 'name') return a.name.localeCompare(b.name);
+            if (sortBy === 'grade') return b.averageGrade - a.averageGrade; // Descending
+            if (sortBy === 'hours') return b.totalTime - a.totalTime;       // Descending
+            return 0;
+        });
+
         setStudents(summaries);
     };
 
@@ -108,12 +104,26 @@ export function Students() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                    Alumnos
-                </h1>
-                <p className="text-zinc-500 dark:text-zinc-400">Listado de alumnos en formación.</p>
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                        <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                        Alumnos
+                    </h1>
+                    <p className="text-zinc-500 dark:text-zinc-400">Listado de alumnos en formación.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-zinc-500">Ordenar por:</span>
+                    <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as any)}
+                        className="text-sm border border-zinc-200 dark:border-zinc-800 rounded-md p-1 bg-white dark:bg-zinc-900"
+                    >
+                        <option value="name">Alfabético</option>
+                        <option value="grade">Nota Media</option>
+                        <option value="hours">Horas de Vuelo</option>
+                    </select>
+                </div>
             </div>
 
             <div className="space-y-3">

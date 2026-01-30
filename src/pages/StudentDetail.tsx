@@ -64,8 +64,11 @@ export function StudentDetail() {
     const realMinutes = logs.reduce((acc, log) => acc + (log.flightType === 'Real' ? (log.totalTime || 0) : 0), 0);
     const simTrainerMinutes = logs.reduce((acc, log) => acc + (['Simulador', 'Entrenador'].includes(log.flightType) ? (log.totalTime || 0) : 0), 0);
 
+    // Filter out "NO EVALUABLE" for stats (Case insensitive check)
+    const evaluableLogs = logs.filter(l => !l.grade.toUpperCase().includes('NO EVALUABLE'));
+
     // Grade stats - handle string mixed content
-    const numericGrades = logs
+    const numericGrades = evaluableLogs
         .map(l => parseFloat(l.grade))
         .filter(n => !isNaN(n));
 
@@ -73,14 +76,15 @@ export function StudentDetail() {
         ? numericGrades.reduce((a, b) => a + b, 0) / numericGrades.length
         : 0;
 
-    const passedCount = logs.filter(l => {
+    const passedCount = evaluableLogs.filter(l => {
         const n = parseFloat(l.grade);
         if (!isNaN(n)) return n >= 5;
-        // Check for text "APTO"
-        return l.grade.toUpperCase().includes('APTO') && !l.grade.toUpperCase().includes('NO');
+        // Check for text "APTO" (excluding "NO APTO")
+        // "VPRA" check is implicit here as they use text grades
+        return l.grade.toUpperCase().includes('APTO') && !l.grade.toUpperCase().includes('NO APTO');
     }).length;
 
-    const failedCount = logs.length - passedCount;
+    const failedCount = evaluableLogs.length - passedCount;
 
     const getDecodedName = () => {
         try {
@@ -219,10 +223,12 @@ export function StudentDetail() {
                 <div className="space-y-3">
                     {logs.map((log) => (
                         <div key={log.id} className="relative pl-6 pb-6 border-l border-zinc-200 dark:border-zinc-800 last:pb-0 last:border-l-0">
-                            {/* Visual indicator logic: Green if >=5 or contains APTO (not NO), Red otherwise */}
-                            <div className={`absolute top-0 left-[-5px] h-2.5 w-2.5 rounded-full ${(parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
-                                ? 'bg-green-500'
-                                : 'bg-red-500'
+                            {/* Visual indicator logic: Green (Pass), Red (Fail), Gray (No Evaluable) */}
+                            <div className={`absolute top-0 left-[-5px] h-2.5 w-2.5 rounded-full ${log.grade.toUpperCase().includes('NO EVALUABLE')
+                                    ? 'bg-zinc-400'
+                                    : (parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
+                                        ? 'bg-green-500'
+                                        : 'bg-red-500'
                                 }`} />
                             <Card>
                                 <CardContent className="p-4">
@@ -242,9 +248,11 @@ export function StudentDetail() {
                                             </div>
                                             <div className="text-sm text-zinc-500"><span className="font-medium text-zinc-700 dark:text-zinc-300">{log.aircraft?.registration || 'N/A'}</span> • {log.instructorName}</div>
                                         </div>
-                                        <div className={`text-xl font-bold ${(parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
-                                            ? 'text-green-600'
-                                            : 'text-red-600'
+                                        <div className={`text-xl font-bold ${log.grade.toUpperCase().includes('NO EVALUABLE')
+                                                ? 'text-zinc-500'
+                                                : (parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
+                                                    ? 'text-green-600'
+                                                    : 'text-red-600'
                                             }`}>
                                             {log.grade}
                                         </div>

@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Plane, PlusCircle, LayoutDashboard, LogOut, Users } from 'lucide-react'
+import { Plane, PlusCircle, LayoutDashboard, LogOut, Users, BarChart3, GraduationCap, Medal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { authService } from '@/services/auth'
 import { useEffect } from 'react'
@@ -19,6 +19,9 @@ export function Layout() {
 
     const navItems = [
         { to: '/', icon: LayoutDashboard, label: 'Logs' },
+        { to: '/meter', icon: BarChart3, label: 'Vuelímetro' },
+        { to: '/tracker', icon: GraduationCap, label: 'Progreso' },
+        ...(user.role === 'admin' ? [{ to: '/instructors', icon: Medal, label: 'Instructores' }] : []),
         { to: '/students', icon: Users, label: 'Alumnos' },
         { to: '/add', icon: PlusCircle, label: 'Nuevo' },
     ];
