@@ -97,5 +97,33 @@ export const authService = {
         } catch (e) {
             console.error("Failed to sync login to cloud", e);
         }
+    },
+
+    getGlobalLoginHistory: async () => {
+        try {
+            // Fetch from Google Script with ?table=logins
+            // Note: Google Script URL is a POST endpoint usually, ensuring it supports GET for doGet
+            const response = await fetch(`${GOOGLE_SCRIPT_URL}?table=logins`);
+            const data = await response.json();
+
+            // Transform data if needed for UI (Sheet headers: FECHA, HORA, USUARIO, NOMBRE, ROL)
+            // We want to map it to { name, timestamp } mostly.
+            // But let's verify what the Script returns. It maps headers to object keys.
+            // So we'll get objects like { "FECHA": "...", "HORA": "...", "NOMBRE": "..." }
+
+            return data.map((row: any) => ({
+                name: row['NOMBRE'] || row['USUARIO'] || 'Desconocido',
+                // Construct timestamp or just use date/time strings for display
+                dateStr: row['FECHA'],
+                timeStr: row['HORA'],
+                // Original robust timestamp might not be reconstructible perfectly due to timezone formatting in script,
+                // but we can trust the display strings.
+                raw: row
+            })).reverse(); // Newest first (Sheet appends to bottom)
+        } catch (error) {
+            console.error("Error fetching global history:", error);
+            // Fallback to local? Or return empty array
+            return [];
+        }
     }
 };

@@ -15,6 +15,8 @@ interface InstructorStats {
 
 export function Instructors() {
     const [stats, setStats] = useState<InstructorStats[]>([]);
+    const [loginHistory, setLoginHistory] = useState<any[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(true);
 
     useEffect(() => {
         // Verify Admin role here.
@@ -67,6 +69,23 @@ export function Instructors() {
         const sorted = Object.values(instructorStats).sort((a, b) => b.total - a.total);
         setStats(sorted);
 
+    }, []);
+
+    useEffect(() => {
+        const loadHistory = async () => {
+            // @ts-ignore
+            if (authService.getGlobalLoginHistory) {
+                // @ts-ignore
+                const remote = await authService.getGlobalLoginHistory();
+                setLoginHistory(remote);
+            } else {
+                // Fallback local
+                // @ts-ignore
+                setLoginHistory(authService.getLoginHistory());
+            }
+            setLoadingHistory(false);
+        };
+        loadHistory();
     }, []);
 
     const formatHours = (mins: number) => (mins / 60).toFixed(1).replace('.', ',');
@@ -133,20 +152,24 @@ export function Instructors() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {(() => {
-                                    // @ts-ignore - Dynamically using new method
-                                    const history = authService.getLoginHistory ? authService.getLoginHistory() : [];
-                                    if (history.length === 0) return <tr><td colSpan={2} className="p-4 text-center text-zinc-400">Sin registros recientes</td></tr>;
-
-                                    return history.map((entry: any, index: number) => (
+                                {loadingHistory ? (
+                                    <tr><td colSpan={2} className="p-4 text-center text-zinc-400">Cargando registros...</td></tr>
+                                ) : loginHistory.length === 0 ? (
+                                    <tr><td colSpan={2} className="p-4 text-center text-zinc-400">Sin registros recientes</td></tr>
+                                ) : (
+                                    loginHistory.map((entry: any, index: number) => (
                                         <tr key={index} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                                             <td className="p-3 font-medium">{entry.name}</td>
                                             <td className="p-3 text-zinc-500 font-mono text-xs">
-                                                {new Date(entry.timestamp).toLocaleDateString()} {new Date(entry.timestamp).toLocaleTimeString()}
+                                                {entry.dateStr ? (
+                                                    <span>{entry.dateStr} {entry.timeStr}</span>
+                                                ) : (
+                                                    <span>{new Date(entry.timestamp).toLocaleDateString()} {new Date(entry.timestamp).toLocaleTimeString()}</span>
+                                                )}
                                             </td>
                                         </tr>
-                                    ));
-                                })()}
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
