@@ -1,4 +1,5 @@
 import { User } from '@/types';
+import { GOOGLE_SCRIPT_URL } from '@/lib/constants';
 
 
 const USERS_KEY = 'heli_users_v1';
@@ -50,6 +51,9 @@ export const authService = {
             if (history.length > 100) history.pop();
             localStorage.setItem('heli_login_history_v1', JSON.stringify(history));
 
+            // Sync Login to Cloud (Fire & Forget)
+            authService.syncLoginToCloud(safeUser);
+
             return safeUser;
         }
         return null;
@@ -73,5 +77,25 @@ export const authService = {
 
     getLoginHistory: () => {
         return JSON.parse(localStorage.getItem('heli_login_history_v1') || '[]');
+    },
+
+    syncLoginToCloud: async (user: User) => {
+        // Fire and forget - don't block UI
+        try {
+            const formData = new FormData();
+            formData.append('action', 'login');
+            formData.append('username', user.username);
+            formData.append('name', user.name);
+            formData.append('role', user.role);
+            formData.append('timestamp', new Date().toISOString());
+
+            await fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                body: formData,
+                mode: 'no-cors'
+            });
+        } catch (e) {
+            console.error("Failed to sync login to cloud", e);
+        }
     }
 };

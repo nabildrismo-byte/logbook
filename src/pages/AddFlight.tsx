@@ -7,7 +7,7 @@ import { Select } from '@/components/ui/Select'
 import { storageService } from '@/services/storage'
 import { authService } from '@/services/auth'
 import { FlightLog, ApproachType, FlightType } from '@/types'
-import { INSTRUCTORS, STUDENTS, AIRCRAFT_REGISTRATIONS, SESSION_TYPES, SESSION_NUMBERS, FLIGHT_TYPES, AIRPORT_CODES } from '@/lib/constants'
+import { INSTRUCTORS, STUDENTS, AIRCRAFT_REGISTRATIONS, SESSION_TYPES, SESSION_NUMBERS, FLIGHT_TYPES, AIRPORT_CODES, GOOGLE_SCRIPT_URL } from '@/lib/constants'
 import { ChevronRight, ChevronLeft, Save } from 'lucide-react'
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -243,7 +243,7 @@ export function AddFlight() {
             // If the Master has a sheet PER STUDENT, then that makes sense.
             // Anyway, I will stick EXACTLY to the requested columns.
 
-            await fetch('https://script.google.com/macros/s/AKfycbyYL5059jqxE6ShBGzhzLI_Cam3j96CV5yaUHCjjogkJSWbXNuOXO9GJZgZll9JXybQ/exec', {
+            await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 body: formDataToSend,
                 mode: 'no-cors' // Creating opaque request to avoid CORS issues with GAS

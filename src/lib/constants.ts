@@ -137,3 +137,5 @@ export const AIRPORT_CODES = [
     'LEVU', 'LEVV', 'LEVX', 'LEVY', 'LEVZ', 'LEWG', 'LEXA', 'LEXE', 'LEXJ', 'LEXN',
     'LEXO', 'LEXU', 'LEZA', 'LEZG', 'LEZL', 'LEZO', 'LEZS', 'LEZU', 'LXGB'
 ];
+
+export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZF4SBOVpJlnea0jsMolCOQaF8s1Oc2b85Z84pu96n35AyyuyBlJ4jepKHHnUan9g_/exec';
