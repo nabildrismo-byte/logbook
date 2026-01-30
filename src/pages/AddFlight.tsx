@@ -330,7 +330,7 @@ export function AddFlight() {
                             value={formData.studentName}
                             onChange={handleChange}
                             options={STUDENTS.map(s => ({ label: s, value: s }))}
-                            className="text-lg py-3"
+                            className="text-xl py-4 h-auto"
                         />
                     </div>
                 );
@@ -343,7 +343,7 @@ export function AddFlight() {
                             value={formData.instructorName}
                             onChange={handleChange}
                             options={INSTRUCTORS.map(i => ({ label: i, value: i }))}
-                            className="text-lg py-3"
+                            className="text-xl py-4 h-auto"
                         />
                     </div>
                 );
@@ -356,7 +356,7 @@ export function AddFlight() {
                             value={formData.sessionType}
                             onChange={handleChange}
                             options={SESSION_TYPES.map(s => ({ label: s, value: s }))}
-                            className="text-lg py-3"
+                            className="text-xl py-4 h-auto"
                         />
                         <Select
                             label="Número de Sesión"
@@ -364,7 +364,7 @@ export function AddFlight() {
                             value={formData.sessionNumber}
                             onChange={handleChange}
                             options={SESSION_NUMBERS.map(n => ({ label: n, value: n }))}
-                            className="text-lg py-3"
+                            className="text-xl py-4 h-auto"
                         />
                     </div>
                 );
@@ -453,7 +453,7 @@ export function AddFlight() {
                             name="date"
                             value={formData.date}
                             onChange={handleChange}
-                            className="text-lg py-6"
+                            className="text-xl py-6 h-auto"
                         />
                     </div>
                 );
@@ -466,7 +466,7 @@ export function AddFlight() {
                             value={formData.flightType}
                             onChange={handleChange}
                             options={FLIGHT_TYPES.map(f => ({ label: f, value: f }))}
-                            className="text-lg py-3"
+                            className="text-xl py-4 h-auto"
                         />
                         {formData.flightType === 'Real' ? (
                             <Select
@@ -475,7 +475,7 @@ export function AddFlight() {
                                 value={formData.aircraftReg}
                                 onChange={handleChange}
                                 options={AIRCRAFT_REGISTRATIONS.map(r => ({ label: r, value: r }))}
-                                className="text-lg py-3"
+                                className="text-xl py-4 h-auto"
                             />
                         ) : (
                             <Input
@@ -483,7 +483,7 @@ export function AddFlight() {
                                 name="aircraftReg"
                                 value={formData.aircraftReg}
                                 onChange={handleChange}
-                                className="text-lg py-6"
+                                className="text-xl py-6 h-auto"
                             />
                         )}
                     </div>

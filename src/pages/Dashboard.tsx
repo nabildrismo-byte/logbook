@@ -108,9 +108,10 @@ export function Dashboard() {
                             }
                         }
                     }}
-                    className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-md transition-colors"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 text-white bg-blue-600 hover:bg-blue-700 font-bold px-6 py-3 rounded-lg shadow-md transition-all active:scale-95"
                 >
-                    <RefreshCw className="h-3 w-3" /> Sincronizar con Google Sheets
+                    <RefreshCw className="h-5 w-5" />
+                    Sincronizar base de datos
                 </button>
                 <div className="flex-1" /> {/* Spacer */}
                 <Link to="/add" className={buttonVariants('ghost', 'sm')}>
