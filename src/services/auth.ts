@@ -38,6 +38,18 @@ export const authService = {
         if (user) {
             const { password, ...safeUser } = user;
             localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(safeUser));
+
+            // Track Login
+            const history = JSON.parse(localStorage.getItem('heli_login_history_v1') || '[]');
+            history.unshift({
+                name: user.name,
+                username: user.username,
+                timestamp: new Date().toISOString()
+            });
+            // Keep only last 100 logins
+            if (history.length > 100) history.pop();
+            localStorage.setItem('heli_login_history_v1', JSON.stringify(history));
+
             return safeUser;
         }
         return null;
@@ -57,5 +69,9 @@ export const authService = {
         const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
         users.push(user);
         localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    },
+
+    getLoginHistory: () => {
+        return JSON.parse(localStorage.getItem('heli_login_history_v1') || '[]');
     }
 };

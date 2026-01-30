@@ -225,10 +225,10 @@ export function StudentDetail() {
                         <div key={log.id} className="relative pl-6 pb-6 border-l border-zinc-200 dark:border-zinc-800 last:pb-0 last:border-l-0">
                             {/* Visual indicator logic: Green (Pass), Red (Fail), Gray (No Evaluable) */}
                             <div className={`absolute top-0 left-[-5px] h-2.5 w-2.5 rounded-full ${log.grade.toUpperCase().includes('NO EVALUABLE')
-                                    ? 'bg-zinc-400'
-                                    : (parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
-                                        ? 'bg-green-500'
-                                        : 'bg-red-500'
+                                ? 'bg-zinc-400'
+                                : (parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
+                                    ? 'bg-green-500'
+                                    : 'bg-red-500'
                                 }`} />
                             <Card>
                                 <CardContent className="p-4">
@@ -249,10 +249,10 @@ export function StudentDetail() {
                                             <div className="text-sm text-zinc-500"><span className="font-medium text-zinc-700 dark:text-zinc-300">{log.aircraft?.registration || 'N/A'}</span> • {log.instructorName}</div>
                                         </div>
                                         <div className={`text-xl font-bold ${log.grade.toUpperCase().includes('NO EVALUABLE')
-                                                ? 'text-zinc-500'
-                                                : (parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
-                                                    ? 'text-green-600'
-                                                    : 'text-red-600'
+                                            ? 'text-zinc-500'
+                                            : (parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
+                                                ? 'text-green-600'
+                                                : 'text-red-600'
                                             }`}>
                                             {log.grade}
                                         </div>
@@ -265,9 +265,22 @@ export function StudentDetail() {
                                         </div>
                                         <div>
                                             <span className="text-zinc-500 block text-xs">MANIOBRAS/OBS</span>
-                                            <p className="line-clamp-2 text-zinc-700 dark:text-zinc-300">
-                                                {log.procedures || log.remarks || '-'}
-                                            </p>
+                                            <button
+                                                onClick={(e) => {
+                                                    const el = e.currentTarget;
+                                                    el.classList.toggle('line-clamp-2');
+                                                    el.classList.toggle('line-clamp-none');
+                                                }}
+                                                className="text-left w-full line-clamp-2 text-zinc-700 dark:text-zinc-300 active:opacity-70 transition-opacity"
+                                            >
+                                                {log.procedures ? (
+                                                    <span><span className="font-semibold">Proc:</span> {log.procedures} </span>
+                                                ) : null}
+                                                {log.remarks ? (
+                                                    <span><span className="font-semibold">Obs:</span> {log.remarks}</span>
+                                                ) : null}
+                                                {!log.procedures && !log.remarks && '-'}
+                                            </button>
                                         </div>
                                     </div>
                                 </CardContent>

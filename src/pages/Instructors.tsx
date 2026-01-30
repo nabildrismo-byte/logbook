@@ -117,6 +117,41 @@ export function Instructors() {
                     </Card>
                 ))}
             </div>
+            {/* LOGIN HISTORY */}
+            <div className="mt-12">
+                <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                    <span className="bg-zinc-100 dark:bg-zinc-800 p-1 rounded">🛡️</span>
+                    Registro de Accesos
+                </h2>
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+                    <div className="max-h-[300px] overflow-y-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-left sticky top-0">
+                                <tr>
+                                    <th className="p-3 font-medium text-zinc-500">Instructor</th>
+                                    <th className="p-3 font-medium text-zinc-500">Fecha/Hora</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(() => {
+                                    // @ts-ignore - Dynamically using new method
+                                    const history = authService.getLoginHistory ? authService.getLoginHistory() : [];
+                                    if (history.length === 0) return <tr><td colSpan={2} className="p-4 text-center text-zinc-400">Sin registros recientes</td></tr>;
+
+                                    return history.map((entry: any, index: number) => (
+                                        <tr key={index} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                            <td className="p-3 font-medium">{entry.name}</td>
+                                            <td className="p-3 text-zinc-500 font-mono text-xs">
+                                                {new Date(entry.timestamp).toLocaleDateString()} {new Date(entry.timestamp).toLocaleTimeString()}
+                                            </td>
+                                        </tr>
+                                    ));
+                                })()}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }
