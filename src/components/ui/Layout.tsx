@@ -84,6 +84,17 @@ export function Layout() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* Mobile 'New' Button */}
+                        {user.role !== 'student' && (
+                            <Link
+                                to="/add"
+                                className="md:hidden flex items-center justify-center bg-blue-600 text-white rounded-full p-1.5 shadow-sm active:scale-95 transition-transform"
+                                title="Nuevo Vuelo"
+                            >
+                                <PlusCircle className="h-5 w-5" />
+                            </Link>
+                        )}
+
                         <span className="text-sm font-medium hidden sm:inline-block text-zinc-600 dark:text-zinc-400">
                             {user.name} ({user.role === 'admin' ? 'Jefe' : user.role === 'student' ? 'Alumno' : 'Inst.'})
                         </span>
