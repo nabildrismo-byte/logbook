@@ -138,4 +138,4 @@ export const AIRPORT_CODES = [
     'LEXO', 'LEXU', 'LEZA', 'LEZG', 'LEZL', 'LEZO', 'LEZS', 'LEZU', 'LXGB'
 ];
 
-export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRfRudi0HE9RQYiizIXhYGYPCZTkZw1tYnr0otZZ7kOZYhKXDuTLutSMnbo4p3MtlJ/exec';
+export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzH5fzXMHloasIxfKtZrl5uKmfI0K2tETMsWXIappsdWHAd3OYZGr08C6W8uSAyXl8b/exec';

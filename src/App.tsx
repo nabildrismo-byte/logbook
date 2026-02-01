@@ -8,7 +8,8 @@ import { FlightMeter } from './pages/FlightMeter'
 import { CourseTracker } from './pages/CourseTracker'
 import { Instructors } from './pages/Instructors'
 import { Login } from '@/pages/Login'
-
+import { MyFlights } from './pages/MyFlights'
+import { AdminValidations } from './pages/AdminValidations'
 
 function App() {
   return (
@@ -20,6 +21,8 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/add" element={<AddFlight />} />
           <Route path="/students" element={<Students />} />
+          <Route path="/my-flights" element={<MyFlights />} />
+          <Route path="/validations" element={<AdminValidations />} />
           <Route path="/tracker" element={<CourseTracker />} />
           <Route path="/instructors" element={<Instructors />} />
           <Route path="/students/:name" element={<StudentDetail />} />

@@ -1,4 +1,5 @@
 import { FlightLog, LogbookStats } from '../types';
+import { GOOGLE_SCRIPT_URL } from '../lib/constants';
 
 const STORAGE_KEY = 'heli_flight_log_v2'; // Bump version for safety
 
@@ -30,6 +31,43 @@ export const storageService = {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newLogs));
     },
 
+    validateFlight: async (id: string, status: 'validated' | 'rejected', feedback?: string): Promise<void> => {
+        const logs = storageService.getLogs();
+        const existingIndex = logs.findIndex(l => l.id === id);
+
+        if (existingIndex >= 0) {
+            // 1. Update Local
+            const log = logs[existingIndex];
+            log.validationStatus = status;
+            if (feedback) {
+                log.studentFeedback = feedback;
+            }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+
+            // 2. Send to Cloud (Fire and Forget)
+            try {
+                const SCRIPT_URL = GOOGLE_SCRIPT_URL;
+
+                // Composite ID to be robust against fresh syncs
+                const compositeId = `${log.date}|${log.studentName}|${log.session}`;
+
+                const formData = new FormData();
+                formData.append('action', 'validate');
+                formData.append('flightId', compositeId);
+                formData.append('status', status);
+                if (feedback) formData.append('feedback', feedback);
+
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: formData,
+                    mode: 'no-cors' // Simple mode
+                });
+            } catch (e) {
+                console.error('Error sending validation to cloud:', e);
+            }
+        }
+    },
+
     clearLogs: (): void => {
         localStorage.removeItem(STORAGE_KEY);
     },
@@ -37,6 +75,9 @@ export const storageService = {
     getStats: (): LogbookStats => {
         const logs = storageService.getLogs();
         return logs.reduce((acc, log) => {
+            // ONLY COUNT VALIDATED FLIGHTS
+            if (log.validationStatus !== 'validated') return acc;
+
             const time = log.totalTime || 0;
             acc.totalHours += time;
 
@@ -63,17 +104,39 @@ export const storageService = {
     syncWithCloud: async (): Promise<boolean> => {
         try {
             // Replace with the user's current URL
-            const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyYL5059jqxE6ShBGzhzLI_Cam3j96CV5yaUHCjjogkJSWbXNuOXO9GJZgZll9JXybQ/exec';
+            const SCRIPT_URL = GOOGLE_SCRIPT_URL;
 
-            const response = await fetch(SCRIPT_URL);
-            const json = await response.json();
+            // 1. Fetch Flights
+            const responseFlights = await fetch(SCRIPT_URL + '?table=flights');
+            const jsonFlights = await responseFlights.json();
 
-            if (json.result !== 'success' || !Array.isArray(json.data)) {
-                console.error('Invalid data format from cloud', json);
+            // 2. Fetch Validations
+            let validations: any[] = [];
+            try {
+                const responseValidations = await fetch(SCRIPT_URL + '?table=validations');
+                validations = await responseValidations.json();
+            } catch (e) {
+                console.warn('Could not fetch validations (maybe sheet missing)', e);
+            }
+
+            if (!Array.isArray(jsonFlights)) {
+                console.error('Invalid data format from cloud', jsonFlights);
                 return false;
             }
 
-            const cloudLogs: FlightLog[] = json.data.map((row: any) => {
+            // Create a Map for validations for O(1) lookup
+            // Key: date|student|session -> { status, feedback }
+            const validationMap = new Map();
+            if (Array.isArray(validations)) {
+                validations.forEach(v => {
+                    const key = v['ID_VUELO'];
+                    // If overwrite logic needed, we could sort by timestamp. 
+                    // Using the latest one encountered (or we could sort validations array first)
+                    validationMap.set(key, { status: v['ESTADO'], feedback: v['FEEDBACK'] });
+                });
+            }
+
+            const cloudLogs: FlightLog[] = jsonFlights.map((row: any) => {
                 // Parse Date (Handle ISO string from Sheets 'Date' object OR 'DD/MM/YYYY' string)
                 let isoDate = '';
                 const rawDate = row['FECHA'];
@@ -121,8 +184,31 @@ export const storageService = {
                     }
                 }
 
+                // Construct ID for validation matching
+                const compositeId = `${isoDate}|${row['ALUMNO'] || ''}|${row['SESIÓN'] || ''}`;
+
+                // Check if we have a cloud validation
+                const cloudVal = validationMap.get(compositeId);
+
+                // Also check local storage to see if we have a NEWER local validation pending sync?
+                // For now, let's trust Cloud if it exists, otherwise keep local? 
+                // Actually, if we just synced, Cloud is truth.
+                // But wait, if I just validated locally and haven't synced yet, I want to keep it?
+                // No, user specifically asked to fix sync overwrite. 
+                // Using Cloud Validations is the robust way.
+
+                // Fallback: If no cloud validation, check if we have an existing local one that we want to keep?
+                // The previous fix was "preserve local". 
+                // Now that we have cloud sync, "Cloud wins" is safer IF the cloud has data.
+
+                const existingLog = storageService.getLogs().find(l =>
+                    l.date === isoDate &&
+                    l.studentName === (row['ALUMNO'] || '') &&
+                    l.session === (row['SESIÓN'] || '')
+                );
+
                 return {
-                    id: Math.random().toString(36).substring(2, 9), // Generate new ID as we don't sync IDs yet
+                    id: existingLog?.id || Math.random().toString(36).substring(2, 9), // Keep ID if exists
                     date: isoDate,
                     instructorId: 'imported',
                     instructorName: row['INSTRUCTOR'] || '',
@@ -147,14 +233,17 @@ export const storageService = {
                     conditions: {},
                     approaches: approaches,
                     procedures: row['PROCEDIMIENTOS'] || '',
-                    remarks: row['OBSERVACIONES'] || ''
+                    remarks: row['OBSERVACIONES'] || '',
+                    // Validation Logic: Cloud is source of truth. If missing in cloud, it means it is pending.
+                    validationStatus: cloudVal?.status,
+                    studentFeedback: cloudVal?.feedback
                 } as FlightLog;
             });
 
             // Filter out invalid logs (e.g. invalid dates)
             const validLogs = cloudLogs.filter(l => l.date && !l.date.includes('undefined'));
 
-            // Always update, even if empty (to allow clearing data)
+            // Always update
             localStorage.setItem(STORAGE_KEY, JSON.stringify(validLogs));
             return true;
 

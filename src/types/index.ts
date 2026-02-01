@@ -1,8 +1,9 @@
 export type FlightRule = 'VFR' | 'IFR' | 'SVFR';
 export type PilotFunction = 'PIC' | 'Dual' | 'Instructor';
 export type ApproachType = 'ILS' | 'VOR' | 'NDB' | 'RNP' | 'LOC' | 'PAR' | 'TACAN' | 'NMS' | 'SID' | 'STAR';
-export type UserRole = 'admin' | 'instructor';
+export type UserRole = 'admin' | 'instructor' | 'student';
 export type FlightType = 'Real' | 'Entrenador' | 'Simulador';
+export type ValidationStatus = 'pending' | 'validated' | 'rejected';
 
 export interface User {
     id: string;
@@ -64,6 +65,10 @@ export interface FlightLog {
     procedures?: string; // Free text for procedures
 
     remarks: string;
+
+    // Validation
+    validationStatus?: ValidationStatus;
+    studentFeedback?: string;
 }
 
 export interface LogbookStats {

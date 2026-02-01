@@ -23,6 +23,9 @@ export function FlightMeter() {
 
         // Aggregate
         logs.forEach(log => {
+            // ONLY COUNT VALIDATED FLIGHTS
+            if (log.validationStatus !== 'validated') return;
+
             let name = log.studentName.trim();
             const match = STUDENTS.find(s => s.toUpperCase() === name.toUpperCase());
             const key = match || name;

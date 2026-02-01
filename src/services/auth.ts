@@ -2,13 +2,14 @@ import { User } from '@/types';
 import { GOOGLE_SCRIPT_URL } from '@/lib/constants';
 
 
-const USERS_KEY = 'heli_users_v1';
+const USERS_KEY = 'heli_users_v2'; // Bumped to force update
 const CURRENT_USER_KEY = 'heli_current_user_v1';
 
 // Seed initial users if empty or force update for v2 security
 const seedUsers = () => {
     // Passwords: 5 chars, letters + numbers
     const users: User[] = [
+        // Instructors
         { id: 'admin', username: 'admin', name: 'Jefe de Curso', role: 'admin', password: '12curso' },
         { id: 'izquierdo', username: 'izquierdo', name: 'IZQUIERDO', role: 'instructor', password: 'zkq85' },
         { id: 'dris', username: 'dris', name: 'DRIS', role: 'instructor', password: 'dr73s' },
@@ -17,7 +18,23 @@ const seedUsers = () => {
         { id: 'benjumea', username: 'benjumea', name: 'BENJUMEA', role: 'instructor', password: 'bnj47' },
         { id: 'soriano', username: 'soriano', name: 'SORIANO', role: 'instructor', password: 'srn63' },
         { id: 'duenas', username: 'dueñas', name: 'DUEÑAS', role: 'instructor', password: 'dn58s' },
+
+        // Students (Unique Passwords)
+        { id: 'exposito', username: 'exposito', name: 'EXPOSITO', role: 'student', password: 'xp48t' },
+        { id: 'mellado', username: 'mellado', name: 'MELLADO', role: 'student', password: 'mld29' },
+        { id: 'pachon', username: 'pachon', name: 'PACHON', role: 'student', password: 'pch73' },
+        { id: 'espinosa', username: 'espinosa', name: 'ESPINOSA', role: 'student', password: 'spn51' },
+        { id: 'trujillo', username: 'trujillo', name: 'TRUJILLO', role: 'student', password: 'trj84' },
+        { id: 'carrillo', username: 'carrillo', name: 'CARRILLO', role: 'student', password: 'crr36' },
+        { id: 'compte', username: 'compte', name: 'COMPTE', role: 'student', password: 'cmp92' },
+        { id: 'm.perez', username: 'm.perez', name: 'M.PEREZ', role: 'student', password: 'prz15' },
+        { id: 'guerrero', username: 'guerrero', name: 'GUERRERO', role: 'student', password: 'grr67' },
+        { id: 's.alonso', username: 's.alonso', name: 'S.ALONSO', role: 'student', password: 'aln49' },
+        { id: 'gayo', username: 'gayo', name: 'GAYO', role: 'student', password: 'ayo23' },
+        { id: 'cuadrado', username: 'cuadrado', name: 'CUADRADO', role: 'student', password: 'cdr88' },
+        { id: 'de las moras', username: 'de las moras', name: 'DE LAS MORAS', role: 'student', password: 'mrs77' },
     ];
+
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
 };
 

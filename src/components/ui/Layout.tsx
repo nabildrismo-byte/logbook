@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Plane, PlusCircle, LayoutDashboard, LogOut, Users, BarChart3, GraduationCap, Medal } from 'lucide-react'
+import { Plane, PlusCircle, LayoutDashboard, LogOut, Users, BarChart3, GraduationCap, Medal, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { authService } from '@/services/auth'
 import { useEffect } from 'react'
@@ -19,11 +19,21 @@ export function Layout() {
 
     const navItems = [
         { to: '/', icon: LayoutDashboard, label: 'Logs' },
-        { to: '/meter', icon: BarChart3, label: 'Vuelímetro' },
-        { to: '/tracker', icon: GraduationCap, label: 'Progreso' },
-        ...(user.role === 'admin' ? [{ to: '/instructors', icon: Medal, label: 'Instructores' }] : []),
-        { to: '/students', icon: Users, label: 'Alumnos' },
-        { to: '/add', icon: PlusCircle, label: 'Nuevo' },
+        ...(user.role !== 'student' ? [
+            { to: '/my-flights', icon: Plane, label: 'Mis Vuelos' },
+            { to: '/meter', icon: BarChart3, label: 'Vuelímetro' },
+            ...(user.role === 'admin' ? [
+                { to: '/instructors', icon: Medal, label: 'Instructores' },
+                { to: '/validations', icon: ShieldCheck, label: 'Validaciones' }
+            ] : []),
+            { to: '/students', icon: Users, label: 'Alumnos' },
+            { to: '/add', icon: PlusCircle, label: 'Nuevo' },
+        ] : []),
+        ...(user.role === 'student' ? [
+            { to: '/tracker', icon: GraduationCap, label: 'Progreso' },
+        ] : [
+            { to: '/tracker', icon: GraduationCap, label: 'Progreso' },
+        ]),
     ];
 
     const handleLogout = () => {
@@ -64,7 +74,7 @@ export function Layout() {
 
                     <div className="flex items-center gap-2">
                         <span className="text-sm font-medium hidden sm:inline-block text-zinc-600 dark:text-zinc-400">
-                            {user.name} ({user.role === 'admin' ? 'Jefe' : 'Inst.'})
+                            {user.name} ({user.role === 'admin' ? 'Jefe' : user.role === 'student' ? 'Alumno' : 'Inst.'})
                         </span>
                         <button onClick={handleLogout} className="p-2 hover:bg-zinc-100 rounded-full dark:hover:bg-zinc-800" title="Cerrar Sesión">
                             <LogOut className="h-5 w-5 text-zinc-500" />

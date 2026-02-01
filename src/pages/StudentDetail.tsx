@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Select } from '@/components/ui/Select'
 import { storageService } from '@/services/storage'
 import { authService } from '@/services/auth'
 import { FlightLog } from '@/types'
 import { format } from 'date-fns'
-import { CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, Check, X, AlertCircle } from 'lucide-react'
 
 
 export function StudentDetail() {
     const { name } = useParams<{ name: string }>();
     const navigate = useNavigate();
     const [logs, setLogs] = useState<FlightLog[]>([]);
+    const [sessionFilter, setSessionFilter] = useState<'all' | 'VBAS' | 'VRAD' | 'VPRA'>('all');
     const user = authService.getCurrentUser();
 
     useEffect(() => {
@@ -105,6 +107,36 @@ export function StudentDetail() {
                     </div>
                 </div>
             </div>
+
+            {/* ADMIN CONTROLS */}
+            {user?.role === 'admin' && logs.some(l => l.validationStatus === 'pending' || !l.validationStatus) && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-900 p-4 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-yellow-100 p-2 rounded-full dark:bg-yellow-900/30">
+                            <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-sm text-yellow-800 dark:text-yellow-200">Acciones Pendientes</h3>
+                            <p className="text-xs text-yellow-600 dark:text-yellow-400">Hay vuelos pendientes de validar.</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={async () => {
+                            if (!confirm('¿Validar todos los vuelos pendientes de este alumno?')) return;
+                            const pendingIds = logs.filter(l => !l.validationStatus || l.validationStatus === 'pending').map(l => l.id);
+
+                            for (const id of pendingIds) {
+                                await storageService.validateFlight(id, 'validated');
+                            }
+                            // Reload
+                            loadStudentData(name || '');
+                        }}
+                        className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold px-4 py-2 rounded-md transition-colors shadow-sm"
+                    >
+                        Validar Todos
+                    </button>
+                </div>
+            )}
 
             {/* SUMMARY CARDS */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -216,77 +248,140 @@ export function StudentDetail() {
 
             {/* FLIGHT HISTORY LIST */}
             <div>
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-zinc-500" />
-                    Histórico de Sesiones
-                </h3>
+                <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-4">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-zinc-500" />
+                        Histórico de Sesiones
+                    </h3>
+
+                    <div className="w-full sm:w-40">
+                        <Select
+                            onChange={(e) => setSessionFilter(e.target.value as any)}
+                            value={sessionFilter}
+                            options={[
+                                { value: 'all', label: 'Todas' },
+                                { value: 'VBAS', label: 'VBAS' },
+                                { value: 'VRAD', label: 'VRAD' },
+                                { value: 'VPRA', label: 'VPRA' }
+                            ]}
+                        />
+                    </div>
+                </div>
+
                 <div className="space-y-3">
-                    {logs.map((log) => (
-                        <div key={log.id} className="relative pl-6 pb-6 border-l border-zinc-200 dark:border-zinc-800 last:pb-0 last:border-l-0">
-                            {/* Visual indicator logic: Green (Pass), Red (Fail), Gray (No Evaluable) */}
-                            <div className={`absolute top-0 left-[-5px] h-2.5 w-2.5 rounded-full ${log.grade.toUpperCase().includes('NO EVALUABLE')
-                                ? 'bg-zinc-400'
-                                : (parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
-                                    ? 'bg-green-500'
-                                    : 'bg-red-500'
-                                }`} />
-                            <Card>
-                                <CardContent className="p-4">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div>
-                                            <div className="font-bold text-lg flex items-center gap-2">
-                                                {log.session}
-                                                <span className="text-xs font-semibold text-zinc-500">
-                                                    {(() => {
-                                                        try {
-                                                            return format(new Date(log.date), 'dd/MM/yyyy');
-                                                        } catch {
-                                                            return log.date;
-                                                        }
-                                                    })()}
-                                                </span>
-                                            </div>
-                                            <div className="text-sm text-zinc-500"><span className="font-medium text-zinc-700 dark:text-zinc-300">{log.aircraft?.registration || 'N/A'}</span> • {log.instructorName}</div>
-                                        </div>
-                                        <div className={`text-xl font-bold ${log.grade.toUpperCase().includes('NO EVALUABLE')
-                                            ? 'text-zinc-500'
-                                            : (parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
-                                                ? 'text-green-600'
-                                                : 'text-red-600'
-                                            }`}>
-                                            {log.grade}
-                                        </div>
+                    {logs.filter(log => {
+                        if (sessionFilter === 'all') return true;
+                        return log.session.toUpperCase().startsWith(sessionFilter);
+                    }).map((log) => {
+                        const isPending = !log.validationStatus || log.validationStatus === 'pending';
+                        const isValidated = log.validationStatus === 'validated';
+                        const isRejected = log.validationStatus === 'rejected';
+
+                        return (
+                            <div key={log.id} className="relative pl-6 pb-6 border-l border-zinc-200 dark:border-zinc-800 last:pb-0 last:border-l-0">
+                                {/* Visual indicator logic: Green (Pass), Red (Fail), Gray (No Evaluable) */}
+                                <div className={`absolute top-0 left-[-5px] h-2.5 w-2.5 rounded-full ${log.grade.toUpperCase().includes('NO EVALUABLE')
+                                    ? 'bg-zinc-400'
+                                    : (parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
+                                        ? 'bg-green-500'
+                                        : 'bg-red-500'
+                                    }`} />
+                                <Card className={isRejected ? 'border-red-300 dark:border-red-800' : ''}>
+                                    <div className="absolute top-2 right-2">
+                                        {isValidated && <span className="text-[10px] font-bold text-white bg-green-500 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm"><Check className="h-3 w-3" /> VALIDADO</span>}
+                                        {isRejected && <span className="text-[10px] font-bold text-white bg-red-500 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm"><X className="h-3 w-3" /> RECHAZADO</span>}
+                                        {isPending && <span className="text-[10px] font-bold text-orange-600 bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 rounded-full flex items-center gap-1 border border-orange-200 dark:border-orange-800 text-center">PENDIENTE VALIDAR</span>}
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4 text-sm mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
-                                        <div>
-                                            <span className="text-zinc-500 block text-xs">TIEMPO</span>
-                                            <span className="font-mono font-medium">{formatDuration(log.totalTime)}</span>
+                                    <CardContent className="p-4 pt-5">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <div className="font-bold text-lg flex items-center gap-2">
+                                                    {log.session}
+                                                    <span className="text-xs font-semibold text-zinc-500">
+                                                        {(() => {
+                                                            try {
+                                                                return format(new Date(log.date), 'dd/MM/yyyy');
+                                                            } catch {
+                                                                return log.date;
+                                                            }
+                                                        })()}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm text-zinc-500"><span className="font-medium text-zinc-700 dark:text-zinc-300">{log.aircraft?.registration || 'N/A'}</span> • {log.instructorName}</div>
+                                            </div>
+                                            <div className={`text-xl font-bold ${log.grade.toUpperCase().includes('NO EVALUABLE')
+                                                ? 'text-zinc-500'
+                                                : (parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
+                                                    ? 'text-green-600'
+                                                    : 'text-red-600'
+                                                }`}>
+                                                {log.grade}
+                                            </div>
                                         </div>
-                                        <div>
-                                            <span className="text-zinc-500 block text-xs">MANIOBRAS/OBS</span>
+
+                                        {isRejected && log.studentFeedback && (
+                                            <div className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm p-3 rounded-md mb-2 mt-2">
+                                                <strong>Motivo rechazo:</strong> {log.studentFeedback}
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-2 gap-4 text-sm mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                                            <div>
+                                                <span className="text-zinc-500 block text-xs">TIEMPO</span>
+                                                <span className="font-mono font-medium">{formatDuration(log.totalTime)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-zinc-500 block text-xs">MANIOBRAS/OBS</span>
+                                                <button
+                                                    onClick={(e) => {
+                                                        const el = e.currentTarget;
+                                                        el.classList.toggle('line-clamp-2');
+                                                        el.classList.toggle('line-clamp-none');
+                                                    }}
+                                                    className="text-left w-full line-clamp-2 text-zinc-700 dark:text-zinc-300 active:opacity-70 transition-opacity"
+                                                >
+                                                    {log.procedures ? (
+                                                        <span><span className="font-semibold">Proc:</span> {log.procedures} </span>
+                                                    ) : null}
+                                                    {log.remarks ? (
+                                                        <span><span className="font-semibold">Obs:</span> {log.remarks}</span>
+                                                    ) : null}
+                                                    {!log.procedures && !log.remarks && '-'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                    {/* ADMIN ACTIONS FOOTER */}
+                                    {user?.role === 'admin' && isPending && (
+                                        <div className="border-t border-zinc-100 dark:border-zinc-800 mt-4 pt-3 flex gap-2">
                                             <button
-                                                onClick={(e) => {
-                                                    const el = e.currentTarget;
-                                                    el.classList.toggle('line-clamp-2');
-                                                    el.classList.toggle('line-clamp-none');
+                                                onClick={async () => {
+                                                    await storageService.validateFlight(log.id, 'validated');
+                                                    loadStudentData(name || '');
                                                 }}
-                                                className="text-left w-full line-clamp-2 text-zinc-700 dark:text-zinc-300 active:opacity-70 transition-opacity"
+                                                className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300 px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1 transition-colors"
                                             >
-                                                {log.procedures ? (
-                                                    <span><span className="font-semibold">Proc:</span> {log.procedures} </span>
-                                                ) : null}
-                                                {log.remarks ? (
-                                                    <span><span className="font-semibold">Obs:</span> {log.remarks}</span>
-                                                ) : null}
-                                                {!log.procedures && !log.remarks && '-'}
+                                                <Check className="h-3 w-3" /> Validar
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    const reason = prompt('Motivo del rechazo:');
+                                                    if (reason) {
+                                                        await storageService.validateFlight(log.id, 'rejected', reason);
+                                                        loadStudentData(name || '');
+                                                    }
+                                                }}
+                                                className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300 px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                                            >
+                                                <X className="h-3 w-3" /> Rechazar
                                             </button>
                                         </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    ))}
+                                    )}
+                                </Card>
+                            </div>
+                        )
+                    })}
                 </div>
             </div>
         </div>

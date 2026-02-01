@@ -5,7 +5,7 @@ import { buttonVariants } from '@/components/ui/Button'
 import { storageService } from '@/services/storage'
 import { authService } from '@/services/auth'
 import { FlightLog, LogbookStats } from '@/types'
-import { Plus, FileText, RefreshCw } from 'lucide-react'
+import { Plus, FileText, RefreshCw, AlertCircle, Check, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 
@@ -17,6 +17,9 @@ export function Dashboard() {
     const [recentLogs, setRecentLogs] = useState<FlightLog[]>([]);
     const [totalPages, setTotalPages] = useState(0);
     const user = authService.getCurrentUser();
+    const [pendingCount, setPendingCount] = useState(0);
+
+    const isStudent = user?.role === 'student';
 
     useEffect(() => {
         if (!user) {
@@ -27,8 +30,40 @@ export function Dashboard() {
     }, [user, navigate, page]); // Reload when page changes
 
     const loadData = () => {
-        setStats(storageService.getStats());
-        const allLogs = storageService.getLogs();
+        let allLogs = storageService.getLogs();
+
+        // IF STUDENT: Filter logs to show only their own
+        if (isStudent) {
+            allLogs = allLogs.filter(l => l.studentName.toUpperCase() === user.name.toUpperCase());
+            // Count pending
+            const pending = allLogs.filter(l => !l.validationStatus || l.validationStatus === 'pending').length;
+            setPendingCount(pending);
+
+            // Calculate student stats manually since getStats() is global
+            const studentStats = allLogs.reduce((acc, log) => {
+                // If filtering for stats, ONLY VALIDATED
+                if (log.validationStatus !== 'validated') return acc;
+
+                const time = log.totalTime || 0;
+                acc.totalHours += time;
+                if (log.flightType === 'Real') acc.realHours += time;
+                else if (log.flightType === 'Simulador') {
+                    acc.simHours += time;
+                    acc.simTrainerTotalHours += time;
+                } else if (log.flightType === 'Entrenador') {
+                    acc.trainerHours += time;
+                    acc.simTrainerTotalHours += time;
+                }
+                return acc;
+            }, {
+                totalHours: 0, realHours: 0, simHours: 0, trainerHours: 0, simTrainerTotalHours: 0
+            });
+            setStats(studentStats);
+        } else {
+            // Instructor/Admin sees global stats
+            setStats(storageService.getStats());
+        }
+
         // Sort by Date Descending (Newest first)
         const sortedLogs = allLogs.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
@@ -39,6 +74,16 @@ export function Dashboard() {
         setRecentLogs(sortedLogs.slice(start, end));
     };
 
+    const handleValidate = (id: string, status: 'validated' | 'rejected') => {
+        if (status === 'rejected') {
+            const feedback = prompt("¿Por qué no coincide esta sesión? (Opcional)");
+            storageService.validateFlight(id, status, feedback || undefined);
+        } else {
+            storageService.validateFlight(id, status);
+        }
+        loadData();
+    };
+
     const formatDuration = (minutes: number) => {
         return (minutes / 60).toFixed(1).replace('.', ',');
     };
@@ -47,50 +92,66 @@ export function Dashboard() {
 
     return (
         <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Card className="sm:col-span-2 bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/50">
-                    <CardHeader className="p-3 pb-1">
-                        <CardTitle className="text-xs font-semibold text-blue-600 dark:text-blue-400">TOTAL HORAS (GENERAL)</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                        <div className="text-3xl font-bold">{formatDuration(stats.totalHours)}</div>
-                    </CardContent>
-                </Card>
+            {/* ALERT FOR STUDENTS */}
+            {isStudent && pendingCount > 0 && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg p-4 flex items-center gap-3">
+                    <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-500" />
+                    <div>
+                        <h3 className="font-bold text-yellow-800 dark:text-yellow-200">Tienes {pendingCount} sesiones pendientes de validar</h3>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300">Por favor revisa tus vuelos recientes y confirma si son correctos.</p>
+                    </div>
+                </div>
+            )}
 
-                <Card className="bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/50">
-                    <CardHeader className="p-3 pb-1">
-                        <CardTitle className="text-xs font-semibold text-green-600 dark:text-green-400">REALES</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                        <div className="text-xl font-bold text-green-700 dark:text-green-300">{formatDuration(stats.realHours)}</div>
-                    </CardContent>
-                </Card>
-                <Card className="bg-orange-50 dark:bg-orange-900/10 border-orange-100 dark:border-orange-900/50">
-                    <CardHeader className="p-3 pb-1">
-                        <CardTitle className="text-xs font-semibold text-orange-600 dark:text-orange-400">SIM + ENT</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                        <div className="text-xl font-bold text-orange-700 dark:text-orange-300">{formatDuration(stats.simTrainerTotalHours)}</div>
-                    </CardContent>
-                </Card>
+            {/* STATS - Conditioned for Student vs General */}
+            {!isStudent && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Card className="sm:col-span-2 bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/50">
+                        <CardHeader className="p-3 pb-1">
+                            <CardTitle className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                                TOTAL HORAS (GENERAL)
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 pt-0">
+                            <div className="text-3xl font-bold">{formatDuration(stats.totalHours)}</div>
+                        </CardContent>
+                    </Card>
 
-                <Card>
-                    <CardHeader className="p-3 pb-1">
-                        <CardTitle className="text-xs font-medium text-zinc-500">SIMULADOR</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                        <div className="text-xl font-bold">{formatDuration(stats.simHours)}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="p-3 pb-1">
-                        <CardTitle className="text-xs font-medium text-zinc-500">ENTRENADOR</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                        <div className="text-xl font-bold">{formatDuration(stats.trainerHours)}</div>
-                    </CardContent>
-                </Card>
-            </div>
+                    <Card className="bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/50">
+                        <CardHeader className="p-3 pb-1">
+                            <CardTitle className="text-xs font-semibold text-green-600 dark:text-green-400">REALES</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 pt-0">
+                            <div className="text-xl font-bold text-green-700 dark:text-green-300">{formatDuration(stats.realHours)}</div>
+                        </CardContent>
+                    </Card>
+                    <Card className="bg-orange-50 dark:bg-orange-900/10 border-orange-100 dark:border-orange-900/50">
+                        <CardHeader className="p-3 pb-1">
+                            <CardTitle className="text-xs font-semibold text-orange-600 dark:text-orange-400">SIM + ENT</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 pt-0">
+                            <div className="text-xl font-bold text-orange-700 dark:text-orange-300">{formatDuration(stats.simTrainerTotalHours)}</div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="p-3 pb-1">
+                            <CardTitle className="text-xs font-medium text-zinc-500">SIMULADOR</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 pt-0">
+                            <div className="text-xl font-bold">{formatDuration(stats.simHours)}</div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="p-3 pb-1">
+                            <CardTitle className="text-xs font-medium text-zinc-500">ENTRENADOR</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 pt-0">
+                            <div className="text-xl font-bold">{formatDuration(stats.trainerHours)}</div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
 
             <div className="space-y-4">
             </div>
@@ -114,18 +175,23 @@ export function Dashboard() {
                     Sincronizar base de datos
                 </button>
                 <div className="flex-1" /> {/* Spacer */}
-                <Link to="/add" className={buttonVariants('ghost', 'sm')}>
-                    <Plus className="h-4 w-4 mr-1" /> Nuevo
-                </Link>
+
+                {!isStudent && (
+                    <Link to="/add" className={buttonVariants('ghost', 'sm')}>
+                        <Plus className="h-4 w-4 mr-1" /> Nuevo
+                    </Link>
+                )}
             </div>
 
             {recentLogs.length === 0 ? (
                 <div className="text-center py-10 text-zinc-500 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg">
                     <FileText className="h-10 w-10 mx-auto mb-2 opacity-20" />
                     <p>No hay vuelos registrados.</p>
-                    <Link to="/add" className={cn(buttonVariants('primary'), "mt-4")}>
-                        <Plus className="mr-2 h-4 w-4" /> Registrar Vuelo
-                    </Link>
+                    {!isStudent && (
+                        <Link to="/add" className={cn(buttonVariants('primary'), "mt-4")}>
+                            <Plus className="mr-2 h-4 w-4" /> Registrar Vuelo
+                        </Link>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -135,17 +201,42 @@ export function Dashboard() {
                         const n = parseFloat(log.grade);
                         const isPassing = !isNaN(n) ? n >= 5 : (gradeUpper.includes('APTO') && !gradeUpper.includes('NO'));
 
+                        // Validation Logic
+                        const isPending = !log.validationStatus || log.validationStatus === 'pending';
+                        const isValidated = log.validationStatus === 'validated';
+                        const isRejected = log.validationStatus === 'rejected';
+
                         return (
                             <Card key={log.id} className="overflow-hidden">
-                                <div className="flex border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 p-2 px-4 justify-between items-center">
+                                <div className={cn(
+                                    "flex border-b border-zinc-100 dark:border-zinc-800 p-2 px-4 justify-between items-center",
+                                    isValidated ? "bg-green-50/50 dark:bg-green-900/20" :
+                                        isRejected ? "bg-red-50/50 dark:bg-red-900/20" :
+                                            "bg-zinc-50/50 dark:bg-zinc-900/50"
+                                )}>
                                     <span className="text-xs font-semibold text-zinc-500">{format(new Date(log.date), 'dd/MM/yyyy')} — {log.session}</span>
-                                    {isNoEvaluable ? (
-                                        <span className="text-xs font-bold text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">{log.grade}</span>
-                                    ) : !isPassing ? (
-                                        <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded-full">NO APTO ({log.grade})</span>
-                                    ) : (
-                                        <span className="text-xs font-bold text-green-600 bg-green-100 dark:bg-green-900/40 px-2 py-0.5 rounded-full">APTO ({log.grade})</span>
-                                    )}
+
+                                    <div className="flex items-center gap-2">
+                                        {/* Validation Status Badge */}
+                                        {isValidated && <span className="text-xs font-bold text-green-600 flex items-center gap-1"><Check className="h-3 w-3" /> Validado</span>}
+                                        {isRejected && <span className="text-xs font-bold text-red-600 flex items-center gap-1"><X className="h-3 w-3" /> Rechazado</span>}
+                                        {isPending && isStudent && <span className="text-xs font-bold text-orange-600 animate-pulse">Pendiente Validar</span>}
+
+                                        {/* Grade Display Logic */}
+                                        {isNoEvaluable ? (
+                                            <span className="text-xs font-bold text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                                                {log.grade}
+                                            </span>
+                                        ) : !isPassing ? (
+                                            <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded-full">
+                                                {isStudent ? 'NO APTO' : `NO APTO (${log.grade})`}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs font-bold text-green-600 bg-green-100 dark:bg-green-900/40 px-2 py-0.5 rounded-full">
+                                                {isStudent ? 'APTO' : `APTO (${log.grade})`}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="p-4 flex items-start justify-between">
                                     <div>
@@ -167,6 +258,23 @@ export function Dashboard() {
                                         )}
                                     </div>
                                 </div>
+                                {/* Validation Actions for Student */}
+                                {isStudent && isPending && (
+                                    <div className="p-3 pt-0 flex gap-2 justify-end">
+                                        <button
+                                            onClick={() => handleValidate(log.id, 'rejected')}
+                                            className="text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 px-3 py-2 rounded transition-colors flex items-center gap-1"
+                                        >
+                                            <X className="h-4 w-4" /> No coincide
+                                        </button>
+                                        <button
+                                            onClick={() => handleValidate(log.id, 'validated')}
+                                            className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded shadow-sm transition-colors flex items-center gap-1"
+                                        >
+                                            <Check className="h-4 w-4" /> Validar
+                                        </button>
+                                    </div>
+                                )}
                             </Card>
                         );
                     })}
