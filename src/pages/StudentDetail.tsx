@@ -14,6 +14,7 @@ export function StudentDetail() {
     const navigate = useNavigate();
     const [logs, setLogs] = useState<FlightLog[]>([]);
     const [sessionFilter, setSessionFilter] = useState<'all' | 'VBAS' | 'VRAD' | 'VPRA'>('all');
+    const [gradeFilter, setGradeFilter] = useState<'all' | 'apto' | 'no-apto' | 'no-evaluable'>('all');
     const user = authService.getCurrentUser();
 
     useEffect(() => {
@@ -68,6 +69,7 @@ export function StudentDetail() {
 
     // Filter out "NO EVALUABLE" for stats (Case insensitive check)
     const evaluableLogs = logs.filter(l => !l.grade.toUpperCase().includes('NO EVALUABLE'));
+    const noEvaluableCount = logs.length - evaluableLogs.length;
 
     // Grade stats - handle string mixed content
     const numericGrades = evaluableLogs
@@ -96,6 +98,14 @@ export function StudentDetail() {
         }
     }
     const displayName = getDecodedName();
+
+    const handleFilterClick = (filter: 'apto' | 'no-apto' | 'no-evaluable') => {
+        if (gradeFilter === filter) {
+            setGradeFilter('all');
+        } else {
+            setGradeFilter(filter);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -139,7 +149,7 @@ export function StudentDetail() {
             )}
 
             {/* SUMMARY CARDS */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <Card>
                     <CardHeader className="p-3 pb-1">
                         <CardTitle className="text-xs font-semibold text-zinc-500">NOTA MEDIA</CardTitle>
@@ -176,7 +186,10 @@ export function StudentDetail() {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/50">
+                <Card
+                    className={`cursor-pointer transition-all ${gradeFilter === 'apto' ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-zinc-950 scale-105 shadow-lg' : 'hover:scale-[1.02]'} bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/50`}
+                    onClick={() => handleFilterClick('apto')}
+                >
                     <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
                         <CardTitle className="text-xs font-semibold text-green-700 dark:text-green-400">APTOS</CardTitle>
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -185,13 +198,28 @@ export function StudentDetail() {
                         <div className="text-2xl font-bold text-green-700 dark:text-green-400">{passedCount}</div>
                     </CardContent>
                 </Card>
-                <Card className="bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/50">
+                <Card
+                    className={`cursor-pointer transition-all ${gradeFilter === 'no-apto' ? 'ring-2 ring-red-500 ring-offset-2 dark:ring-offset-zinc-950 scale-105 shadow-lg' : 'hover:scale-[1.02]'} bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/50`}
+                    onClick={() => handleFilterClick('no-apto')}
+                >
                     <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
                         <CardTitle className="text-xs font-semibold text-red-700 dark:text-red-400">NO APTOS</CardTitle>
                         <XCircle className="h-4 w-4 text-red-600" />
                     </CardHeader>
                     <CardContent className="p-3 pt-0">
                         <div className="text-2xl font-bold text-red-700 dark:text-red-400">{failedCount}</div>
+                    </CardContent>
+                </Card>
+                <Card
+                    className={`cursor-pointer transition-all md:col-span-3 lg:col-span-1 ${gradeFilter === 'no-evaluable' ? 'ring-2 ring-zinc-400 ring-offset-2 dark:ring-offset-zinc-950 scale-105 shadow-lg' : 'hover:scale-[1.02]'} bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700`}
+                    onClick={() => handleFilterClick('no-evaluable')}
+                >
+                    <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
+                        <CardTitle className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">NO EVAL</CardTitle>
+                        <span className="h-4 w-4 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                    </CardHeader>
+                    <CardContent className="p-3 pt-0">
+                        <div className="text-2xl font-bold text-zinc-700 dark:text-zinc-300">{noEvaluableCount}</div>
                     </CardContent>
                 </Card>
             </div>
@@ -270,8 +298,36 @@ export function StudentDetail() {
 
                 <div className="space-y-3">
                     {logs.filter(log => {
-                        if (sessionFilter === 'all') return true;
-                        return log.session.toUpperCase().startsWith(sessionFilter);
+                        // 1. Filter by Session Type
+                        let sessionMatch = true;
+                        if (sessionFilter !== 'all') {
+                            sessionMatch = log.session.toUpperCase().startsWith(sessionFilter);
+                        }
+                        if (!sessionMatch) return false;
+
+                        // 2. Filter by Grade Status (Interactive Cards)
+                        if (gradeFilter === 'all') return true;
+
+                        const gradeUpper = log.grade.toUpperCase();
+                        const isNoEval = gradeUpper.includes('NO EVALUABLE');
+
+                        if (gradeFilter === 'no-evaluable') return isNoEval;
+
+                        // Parse numeric grade or check text grade
+                        const numGrade = parseFloat(log.grade);
+                        let isPass = false;
+                        if (!isNaN(numGrade)) {
+                            isPass = numGrade >= 5;
+                        } else {
+                            // Text based check
+                            isPass = gradeUpper.includes('APTO') && !gradeUpper.includes('NO');
+                        }
+
+                        if (gradeFilter === 'apto') return !isNoEval && isPass;
+                        if (gradeFilter === 'no-apto') return !isNoEval && !isPass;
+
+                        return true;
+
                     }).map((log) => {
                         const isPending = !log.validationStatus || log.validationStatus === 'pending';
                         const isValidated = log.validationStatus === 'validated';

@@ -55,7 +55,7 @@ export function Login() {
 
                         <div className="mt-8 text-center text-xs text-zinc-400">
                             <p>© Desarrollado por Capitán DRIS</p>
-                            <p className="mt-1">Versión Beta 2.1.1</p>
+                            <p className="mt-1">Versión Beta 2.3.7</p>
                         </div>
                     </form>
                 </CardContent>

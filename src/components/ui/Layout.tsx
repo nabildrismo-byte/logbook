@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Plane, PlusCircle, LayoutDashboard, LogOut, Users, BarChart3, GraduationCap, Medal, ShieldCheck } from 'lucide-react'
+import { PlusCircle, LayoutDashboard, LogOut, Users, BarChart3, GraduationCap, Medal, ShieldCheck, Plane } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { authService } from '@/services/auth'
 import { useEffect } from 'react'
@@ -27,7 +27,7 @@ export function Layout() {
                 { to: '/validations', icon: ShieldCheck, label: 'Validaciones' }
             ] : []),
             { to: '/students', icon: Users, label: 'Alumnos' },
-            { to: '/add', icon: PlusCircle, label: 'Nuevo' },
+            // Removed 'Nuevo' from here to place manually
         ] : []),
         ...(user.role === 'student' ? [
             { to: '/tracker', icon: GraduationCap, label: 'Progreso' },
@@ -44,7 +44,7 @@ export function Layout() {
     return (
         <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col">
             <header className="sticky top-0 z-50 w-full border-b border-zinc-200 bg-white/80 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-950/80">
-                <div className="container flex h-14 max-w-screen-md mx-auto items-center justify-between px-4">
+                <div className="container flex h-14 max-w-screen-xl mx-auto items-center justify-between px-4">
                     <div className="flex items-center gap-6">
                         <Link to="/" className="flex items-center space-x-2">
                             <Plane className="h-6 w-6 rotate-[-90deg] text-blue-600" />
@@ -52,7 +52,18 @@ export function Layout() {
                         </Link>
 
                         {/* DESKTOP NAV */}
-                        <nav className="hidden md:flex items-center gap-4">
+                        <nav className="hidden md:flex items-center gap-2 lg:gap-4">
+                            {/* Prominent NEW button at the start */}
+                            {user.role !== 'student' && (
+                                <Link
+                                    to="/add"
+                                    className="flex items-center gap-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full transition-colors shadow-sm mr-2"
+                                >
+                                    <PlusCircle className="h-4 w-4" />
+                                    NUEVO
+                                </Link>
+                            )}
+
                             {navItems.map(({ to, label, icon: Icon }) => {
                                 const isActive = location.pathname === to || (to === '/students' && location.pathname.startsWith('/students'));
                                 return (
@@ -60,8 +71,8 @@ export function Layout() {
                                         key={to}
                                         to={to}
                                         className={cn(
-                                            "flex items-center gap-2 text-sm font-medium transition-colors hover:text-blue-600",
-                                            isActive ? "text-blue-600" : "text-zinc-500"
+                                            "flex items-center gap-1.5 text-sm font-medium transition-colors hover:text-blue-600 px-2 py-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                                            isActive ? "text-blue-600 bg-blue-50 dark:bg-blue-900/10" : "text-zinc-500"
                                         )}
                                     >
                                         <Icon className="h-4 w-4" />
