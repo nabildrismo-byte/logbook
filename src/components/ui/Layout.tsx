@@ -22,9 +22,9 @@ export function Layout() {
         ...(user.role !== 'student' ? [
             { to: '/my-flights', icon: Plane, label: 'Mis Vuelos' },
             { to: '/meter', icon: BarChart3, label: 'Vuelímetro' },
+            { to: '/validations', icon: ShieldCheck, label: 'Validaciones' },
             ...(user.role === 'admin' ? [
                 { to: '/instructors', icon: Medal, label: 'Instructores' },
-                { to: '/validations', icon: ShieldCheck, label: 'Validaciones' }
             ] : []),
             { to: '/students', icon: Users, label: 'Alumnos' },
             // Removed 'Nuevo' from here to place manually
@@ -54,15 +54,13 @@ export function Layout() {
                         {/* DESKTOP NAV */}
                         <nav className="hidden md:flex items-center gap-2 lg:gap-4">
                             {/* Prominent NEW button at the start */}
-                            {user.role !== 'student' && (
-                                <Link
-                                    to="/add"
-                                    className="flex items-center gap-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full transition-colors shadow-sm mr-2"
-                                >
-                                    <PlusCircle className="h-4 w-4" />
-                                    NUEVO
-                                </Link>
-                            )}
+                            <Link
+                                to="/add"
+                                className="flex items-center gap-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full transition-colors shadow-sm mr-2"
+                            >
+                                <PlusCircle className="h-4 w-4" />
+                                NUEVO
+                            </Link>
 
                             {navItems.map(({ to, label, icon: Icon }) => {
                                 const isActive = location.pathname === to || (to === '/students' && location.pathname.startsWith('/students'));
@@ -85,15 +83,13 @@ export function Layout() {
 
                     <div className="flex items-center gap-2">
                         {/* Mobile 'New' Button */}
-                        {user.role !== 'student' && (
-                            <Link
-                                to="/add"
-                                className="md:hidden flex items-center justify-center bg-blue-600 text-white rounded-full p-1.5 shadow-sm active:scale-95 transition-transform"
-                                title="Nuevo Vuelo"
-                            >
-                                <PlusCircle className="h-5 w-5" />
-                            </Link>
-                        )}
+                        <Link
+                            to="/add"
+                            className="md:hidden flex items-center justify-center bg-blue-600 text-white rounded-full p-1.5 shadow-sm active:scale-95 transition-transform"
+                            title="Nuevo Vuelo"
+                        >
+                            <PlusCircle className="h-5 w-5" />
+                        </Link>
 
                         <span className="text-sm font-medium hidden sm:inline-block text-zinc-600 dark:text-zinc-400">
                             {user.name} ({user.role === 'admin' ? 'Jefe' : user.role === 'student' ? 'Alumno' : 'Inst.'})

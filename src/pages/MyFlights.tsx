@@ -30,10 +30,17 @@ export function MyFlights() {
 
     const loadMyFlights = () => {
         const allLogs = storageService.getLogs();
-        // Filter by Instructor Name (case insensitive)
-        const myLogs = allLogs.filter(l =>
-            l.instructorName.toUpperCase().includes(user?.name.toUpperCase() || '')
-        ).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+
+        if (!user?.name) return;
+
+        const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+        const myNameNormalized = normalize(user.name);
+
+        // Filter by Instructor Name (normalize match)
+        const myLogs = allLogs.filter(l => {
+            const logInstructor = normalize(l.instructorName || '');
+            return logInstructor.includes(myNameNormalized);
+        }).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
         setLogs(myLogs);
     };
@@ -78,7 +85,14 @@ export function MyFlights() {
                                         'bg-orange-50 dark:bg-orange-900/10'
                                     }`}>
                                     <span className="text-xs font-semibold text-zinc-500">
-                                        {format(new Date(log.date), 'dd/MM/yyyy')} — {log.session}
+                                        {(() => {
+                                            try {
+                                                if (!log.date) return 'Sin fecha';
+                                                const d = new Date(log.date);
+                                                if (isNaN(d.getTime())) return 'Fecha inválida';
+                                                return format(d, 'dd/MM/yyyy');
+                                            } catch (e) { return 'Fecha error'; }
+                                        })()} — {log.session}
                                     </span>
                                     <div className="flex items-center gap-2">
                                         {status === 'validated' && <span className="text-xs font-bold text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Validado</span>}

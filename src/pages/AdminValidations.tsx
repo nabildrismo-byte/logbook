@@ -17,17 +17,30 @@ export function AdminValidations() {
     const [groupedLogs, setGroupedLogs] = useState<Record<string, FlightLog[]>>({});
 
     useEffect(() => {
-        if (!user || user.role !== 'admin') {
+        if (!user || (user.role !== 'admin' && user.role !== 'instructor')) {
             navigate('/');
             return;
         }
         loadPendingFlights();
-    }, [user, navigate]);
+    }, [user?.id, navigate]);
 
     const loadPendingFlights = () => {
         const allLogs = storageService.getLogs();
-        const pending = allLogs.filter(l => !l.validationStatus || l.validationStatus === 'pending')
+
+        // Base Filter: Pending flights
+        let pending = allLogs.filter(l => !l.validationStatus || l.validationStatus === 'pending')
             .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+
+        // INSTRUCTOR FILTER: Only show flights where they are the instructor
+        if (user?.role === 'instructor') {
+            const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+            const myNameNormalized = normalize(user.name);
+
+            pending = pending.filter(l => {
+                const logInstructor = normalize(l.instructorName || '');
+                return logInstructor === myNameNormalized; // Exact match or include? exact seems safer for validation
+            });
+        }
 
         setPendingLogs(pending);
 
@@ -41,26 +54,71 @@ export function AdminValidations() {
         setGroupedLogs(groups);
     };
 
-    const handleValidate = async (logId: string) => {
-        await storageService.validateFlight(logId, 'validated');
-        loadPendingFlights(); // Refresh
+    const [validationModal, setValidationModal] = useState<{
+        isOpen: boolean;
+        logId: string | null;
+        grade: string;
+        remarks: string;
+        studentName: string; // for context
+    }>({
+        isOpen: false,
+        logId: null,
+        grade: '',
+        remarks: '',
+        studentName: ''
+    });
+
+
+
+    const openValidationModal = (log: FlightLog) => {
+        setValidationModal({
+            isOpen: true,
+            logId: log.id,
+            grade: '',
+            remarks: '',
+            studentName: log.studentName
+        });
+    };
+
+    const closeValidationModal = () => {
+        setValidationModal(prev => ({ ...prev, isOpen: false, logId: null }));
+    };
+
+    const handleConfirmValidation = async () => {
+        if (!validationModal.logId) return;
+        if (!validationModal.grade) {
+            alert('Debes introducir una calificación.');
+            return;
+        }
+
+        await storageService.validateFlight(
+            validationModal.logId,
+            'validated',
+            undefined, // no rejection feedback
+            validationModal.grade,
+            validationModal.remarks
+        );
+
+        closeValidationModal();
+        loadPendingFlights();
     };
 
     const handleReject = async (logId: string) => {
         const feedback = prompt("Motivo del rechazo (opcional):") || "Sin especificar";
         await storageService.validateFlight(logId, 'rejected', feedback);
-        loadPendingFlights(); // Refresh
-    };
-
-    const handleValidateBatch = async (studentName: string) => {
-        if (!confirm(`¿Validar TODOS los vuelos pendientes de ${studentName}?`)) return;
-
-        const logsToValidate = groupedLogs[studentName];
-        for (const log of logsToValidate) {
-            await storageService.validateFlight(log.id, 'validated');
-        }
         loadPendingFlights();
     };
+
+    // const handleValidateBatch = async (studentName: string) => {
+    //    // Batch validation assumes pass? Or maybe we disable batch for now since grades are needed?
+    //    // User didn't specify batch behavior. 
+    //    // Safer to ALERT that batch validation will set default grade? Or disable it.
+    //    // Let's keep it but warn. Actually, better to disable batch if grading is required per flight.
+    //    // User requirement: "Instructor introduces grade...". Batch makes this hard.
+    //    // I will prompt: "This will validate all flights as APTO / 5.0? No, that's risky."
+    //    // I'll disable batch loop logic and force individual validation for now to ensure grading.
+    //    alert("La validación por lotes está deshabilitada temporalmente para asegurar la calificación individual de cada vuelo.");
+    // };
 
     const formatDuration = (minutes: number) => (minutes / 60).toFixed(1).replace('.', ',');
 
@@ -73,7 +131,86 @@ export function AdminValidations() {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative">
+            {/* MODAL OVERLAY */}
+            {validationModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <Card className="w-full max-w-md bg-white dark:bg-zinc-900 shadow-xl border-zinc-200 dark:border-zinc-800">
+                        <CardContent className="p-6 space-y-4">
+                            <h3 className="text-lg font-bold">Validar Vuelo - {validationModal.studentName}</h3>
+
+                            {/* NO EVALUABLE TOGGLE */}
+                            <div className="flex items-center gap-2 mb-4">
+                                <input
+                                    type="checkbox"
+                                    id="no-evaluable-admin"
+                                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    checked={validationModal.grade === 'NO EVALUABLE'}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setValidationModal(prev => ({ ...prev, grade: 'NO EVALUABLE' }));
+                                        } else {
+                                            setValidationModal(prev => ({ ...prev, grade: '5' }));
+                                        }
+                                    }}
+                                />
+                                <label htmlFor="no-evaluable-admin" className="text-sm font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
+                                    Marcar como NO EVALUABLE
+                                </label>
+                            </div>
+
+                            {validationModal.grade !== 'NO EVALUABLE' && (
+                                <div className="space-y-4">
+                                    <div className="text-center">
+                                        <div className={`text-5xl font-bold font-mono transition-colors ${!validationModal.grade ? 'text-zinc-300' : parseFloat(validationModal.grade) < 5 ? 'text-red-500' : 'text-blue-600'
+                                            }`}>
+                                            {validationModal.grade || '0'}
+                                        </div>
+                                        <div className="text-sm font-medium text-zinc-400 mt-1">
+                                            {validationModal.grade ? (parseFloat(validationModal.grade) < 5 ? 'NO APTO' : 'APTO') : 'Selecciona nota'}
+                                        </div>
+                                    </div>
+
+                                    <div className="px-2 pb-2">
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="10"
+                                            step="0.5"
+                                            value={parseFloat(validationModal.grade) || 0}
+                                            onChange={(e) => setValidationModal(prev => ({ ...prev, grade: e.target.value }))}
+                                            className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-blue-600"
+                                        />
+                                        <div className="flex justify-between text-xs text-zinc-400 mt-2 font-mono">
+                                            <span>0</span>
+                                            <span>5</span>
+                                            <span>10</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Observaciones (Feedback)</label>
+                                <textarea
+                                    className="w-full p-2 border rounded min-h-[80px] dark:bg-zinc-800 dark:border-zinc-700"
+                                    placeholder="Comentarios"
+                                    value={validationModal.remarks}
+                                    onChange={(e) => setValidationModal(prev => ({ ...prev, remarks: e.target.value }))}
+                                />
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <Button variant="outline" onClick={closeValidationModal} className="flex-1">Cancelar</Button>
+                                <Button onClick={handleConfirmValidation} className="flex-1 bg-green-600 hover:bg-green-700 text-white">
+                                    <Check className="mr-2 h-4 w-4" /> Confirmar
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
             <div className="flex flex-col gap-2">
                 <h1 className="text-2xl font-bold flex items-center gap-2">
                     <ShieldCheck className="h-8 w-8 text-blue-600" />
@@ -100,13 +237,7 @@ export function AdminValidations() {
                                         {groupedLogs[studentName].length} pendientes
                                     </span>
                                 </h2>
-                                <Button
-                                    size="sm"
-                                    onClick={() => handleValidateBatch(studentName)}
-                                    className="bg-green-600 hover:bg-green-700 text-white"
-                                >
-                                    Validar Todos
-                                </Button>
+                                {/* Batch disabled for safety with new flow */}
                             </div>
 
                             <div className="grid gap-3">
@@ -132,24 +263,40 @@ export function AdminValidations() {
                                                     {(log.remarks || log.procedures) && (
                                                         <div className="mt-2 text-xs text-zinc-500 bg-zinc-50 dark:bg-zinc-900/50 p-2 rounded">
                                                             {log.procedures && <div className='mb-0.5'><span className='font-semibold'>Proc:</span> {log.procedures}</div>}
+                                                            {/* Remarks might be empty if student added it. */}
                                                             {log.remarks && <div><span className='font-semibold'>Obs:</span> {log.remarks}</div>}
                                                         </div>
                                                     )}
                                                 </div>
 
                                                 <div className="flex items-center gap-2 sm:flex-col sm:justify-center border-t sm:border-t-0 sm:border-l pt-3 sm:pt-0 sm:pl-4 border-zinc-100 dark:border-zinc-800">
-                                                    <button
-                                                        onClick={() => handleValidate(log.id)}
-                                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                                                    >
-                                                        <Check className="h-4 w-4" /> Validar
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleReject(log.id)}
-                                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                                                    >
-                                                        <X className="h-4 w-4" /> Rechazar
-                                                    </button>
+                                                    {/* Only allow actions if Pending OR if User is Admin */}
+                                                    {(user?.role === 'admin' || (!log.validationStatus || log.validationStatus === 'pending')) && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => openValidationModal(log)}
+                                                                className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                                                            >
+                                                                <ShieldCheck className="h-4 w-4" /> {log.validationStatus === 'validated' ? 'Editar' : 'Calificar'}
+                                                            </button>
+
+                                                            {log.validationStatus !== 'rejected' && (
+                                                                <button
+                                                                    onClick={() => handleReject(log.id)}
+                                                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                                                                >
+                                                                    <X className="h-4 w-4" /> Rechazar
+                                                                </button>
+                                                            )}
+                                                        </>
+                                                    )}
+
+                                                    {/* Message if Instructor sees validated/rejected item (shouldnt happen due to filter, but safely) */}
+                                                    {user?.role === 'instructor' && log.validationStatus && log.validationStatus !== 'pending' && (
+                                                        <span className="text-xs text-zinc-400 font-medium text-center">
+                                                            {log.validationStatus === 'validated' ? 'Validado' : 'Rechazado'}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </CardContent>

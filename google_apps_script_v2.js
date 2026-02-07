@@ -26,19 +26,30 @@ function doPost(e) {
         var validSheet = sheet.getSheetByName('Validaciones');
         if (!validSheet) {
             validSheet = sheet.insertSheet('Validaciones');
-            validSheet.appendRow(['FECHA_ACCION', 'ID_VUELO', 'ESTADO', 'FEEDBACK']);
+            validSheet.appendRow(['FECHA_ACCION', 'ID_VUELO', 'ESTADO', 'FEEDBACK', 'NOTA', 'OBS_VALIDACION']);
+        } else {
+            // Hotfix: Ensure headers exist if sheet exists but old columns
+            var headers = validSheet.getRange(1, 1, 1, validSheet.getLastColumn()).getValues()[0];
+            if (headers.indexOf('NOTA') === -1) {
+                // Determine next column index (1-based)
+                var nextCol = headers.length + 1;
+                validSheet.getRange(1, nextCol).setValue('NOTA');
+                validSheet.getRange(1, nextCol + 1).setValue('OBS_VALIDACION');
+            }
         }
 
         var timestamp = new Date();
         var dateStr = Utilities.formatDate(timestamp, "Europe/Madrid", "dd/MM/yyyy HH:mm:ss");
 
         // Composite ID from client or params
-        // Expected params: flightId (or composite), status, feedback
+        // Expected params: flightId (or composite), status, feedback, grade, remarks
         validSheet.appendRow([
             dateStr,
             params.flightId || '',
             params.status || '',
-            params.feedback || ''
+            params.feedback || '',
+            params.grade || '', // ADDED GRADE
+            params.remarks || '' // ADDED REMARKS
         ]);
         return ContentService.createTextOutput("Validacion OK");
     }

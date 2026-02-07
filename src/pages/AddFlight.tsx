@@ -23,7 +23,7 @@ export function AddFlight() {
     // Default Form State
     const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
-        studentName: STUDENTS[0] || '',
+        studentName: user?.role === 'student' ? user.name : (STUDENTS[0] || ''),
         flightType: 'Real' as FlightType,
         sessionType: SESSION_TYPES[0],
         sessionNumber: '1',
@@ -60,7 +60,7 @@ export function AddFlight() {
         if (!user) {
             navigate('/login');
         }
-    }, [user, navigate]);
+    }, [user?.id, navigate]);
 
     // Auto-detect Real/Sim
     useEffect(() => {
@@ -254,7 +254,7 @@ export function AddFlight() {
             // Clean Form
             setFormData({
                 date: new Date().toISOString().split('T')[0],
-                studentName: '', // Reset Name too? Usually instructor logs many flights. Let's reset for safety.
+                studentName: user?.role === 'student' ? user.name : '', // Reset Name too? Usually instructor logs many flights. Let's reset for safety.
                 flightType: 'Real',
                 sessionType: SESSION_TYPES[0],
                 sessionNumber: '1',
@@ -302,16 +302,18 @@ export function AddFlight() {
     // Easier: Map generic steps to content.
 
     const steps = [
-        { id: 'student', title: 'Alumno' },
-        ...(user?.role === 'admin' ? [{ id: 'instructor', title: 'Instructor' }] : []),
+        ...(user?.role !== 'student' ? [{ id: 'student', title: 'Alumno' }] : []),
+        ...(user?.role === 'admin' || user?.role === 'student' ? [{ id: 'instructor', title: 'Instructor' }] : []),
         { id: 'session', title: 'Sesión' },
-        { id: 'grade', title: 'Calificación' },
+        // Skip Grade for Students
+        ...(user?.role !== 'student' ? [{ id: 'grade', title: 'Calificación' }] : []),
         { id: 'date', title: 'Fecha' },
         { id: 'aircraft', title: 'Aeronave' },
         { id: 'route', title: 'Ruta' },
         { id: 'time', title: 'Tiempo' },
         { id: 'approaches', title: 'Maniobras IFR' },
-        { id: 'details', title: 'Detalles' },
+        // Show Details (Remarks/Procedures) ONLY if NOT student
+        ...(user?.role !== 'student' ? [{ id: 'details', title: 'Detalles' }] : []),
     ];
 
     const currentStepId = steps[currentStep]?.id;
@@ -418,7 +420,7 @@ export function AddFlight() {
                                 min="0"
                                 max="10"
                                 step="0.5"
-                                value={formData.grade || 0}
+                                value={parseFloat(formData.grade) || 0}
                                 onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))}
                                 className="w-full h-3 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-blue-600"
                             />
@@ -431,16 +433,23 @@ export function AddFlight() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-4 gap-2 mt-4">
-                            {[5, 6, 7, 8].map(quickVal => (
-                                <button
-                                    key={quickVal}
-                                    onClick={() => setFormData(prev => ({ ...prev, grade: String(quickVal) }))}
-                                    className="py-2 px-1 text-sm bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 rounded font-mono text-zinc-500"
-                                >
-                                    {quickVal}
-                                </button>
-                            ))}
+                        <div className="flex items-center justify-center gap-2 mt-6">
+                            <input
+                                type="checkbox"
+                                id="no-evaluable-add"
+                                className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                checked={formData.grade === 'NO EVALUABLE'}
+                                onChange={(e) => {
+                                    if (e.target.checked) {
+                                        setFormData(prev => ({ ...prev, grade: 'NO EVALUABLE' }));
+                                    } else {
+                                        setFormData(prev => ({ ...prev, grade: '5' }));
+                                    }
+                                }}
+                            />
+                            <label htmlFor="no-evaluable-add" className="text-sm font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
+                                Marcar como NO EVALUABLE
+                            </label>
                         </div>
                     </div>
                 );
@@ -625,26 +634,20 @@ export function AddFlight() {
             case 'details':
                 return (
                     <div className="space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Procedimientos</label>
-                            <textarea
-                                name="procedures"
-                                className="flex min-h-[100px] w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-zinc-800 dark:bg-zinc-950 dark:focus-visible:ring-blue-800"
-                                value={formData.procedures}
-                                onChange={handleChange}
-                                placeholder="Detalles de ejercicios..."
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Observaciones</label>
-                            <textarea
-                                name="remarks"
-                                className="flex min-h-[100px] w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-zinc-800 dark:bg-zinc-950 dark:focus-visible:ring-blue-800"
-                                value={formData.remarks}
-                                onChange={handleChange}
-                                placeholder="Comentarios del instructor..."
-                            />
-                        </div>
+
+                        {/* Hide Remarks for Students */}
+                        {user && user.role !== 'student' && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Observaciones</label>
+                                <textarea
+                                    name="remarks"
+                                    className="flex min-h-[100px] w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-zinc-800 dark:bg-zinc-950 dark:focus-visible:ring-blue-800"
+                                    value={formData.remarks}
+                                    onChange={handleChange}
+                                    placeholder="Comentarios"
+                                />
+                            </div>
+                        )}
                     </div>
                 );
             default:

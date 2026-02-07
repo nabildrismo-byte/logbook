@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Select } from '@/components/ui/Select'
 import { buttonVariants } from '@/components/ui/Button'
 import { storageService } from '@/services/storage'
 import { authService } from '@/services/auth'
@@ -18,6 +19,11 @@ export function Dashboard() {
     const [totalPages, setTotalPages] = useState(0);
     const user = authService.getCurrentUser();
     const [pendingCount, setPendingCount] = useState(0);
+    const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'validated' | 'rejected'>('all');
+    const [instructorFilter, setInstructorFilter] = useState<string>('all');
+    const [sessionFilter, setSessionFilter] = useState<'all' | 'VBAS' | 'VRAD' | 'VPRA'>('all');
+    const [dateSort, setDateSort] = useState<'asc' | 'desc'>('desc');
+    const [availableInstructors, setAvailableInstructors] = useState<string[]>([]);
 
     const isStudent = user?.role === 'student';
 
@@ -27,7 +33,7 @@ export function Dashboard() {
             return;
         }
         loadData();
-    }, [user, navigate, page]); // Reload when page changes
+    }, [user, navigate, page, statusFilter, instructorFilter, sessionFilter, dateSort]); // Reload when page or filter changes
 
     const loadData = () => {
         let allLogs = storageService.getLogs();
@@ -38,6 +44,16 @@ export function Dashboard() {
             // Count pending
             const pending = allLogs.filter(l => !l.validationStatus || l.validationStatus === 'pending').length;
             setPendingCount(pending);
+
+            // Extract Instructors (Unique)
+            const instructors = Array.from(new Set(allLogs.map(l => l.instructorName).filter(Boolean))).sort();
+            setAvailableInstructors(instructors);
+
+            // Apply Status Filter for LIST (not for stats, stats usually show global progress, but user asked for "visibility and filter")
+            // Actually, if I filter 'allLogs' here, it affects stats calculation below if I reuse 'allLogs'.
+            // The student wants to SEE filtered logs.
+            // Let's create a separate filtered array for display.
+
 
             // Calculate student stats manually since getStats() is global
             const studentStats = allLogs.reduce((acc, log) => {
@@ -64,8 +80,33 @@ export function Dashboard() {
             setStats(storageService.getStats());
         }
 
-        // Sort by Date Descending (Newest first)
-        const sortedLogs = allLogs.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+        // Apply Status Filter
+        if (statusFilter !== 'all') {
+            allLogs = allLogs.filter(l => {
+                const status = l.validationStatus || 'pending';
+                if (statusFilter === 'pending') return status === 'pending';
+                if (statusFilter === 'validated') return status === 'validated';
+                if (statusFilter === 'rejected') return status === 'rejected';
+                return true;
+            });
+        }
+
+        // Apply Instructor Filter
+        if (instructorFilter !== 'all') {
+            allLogs = allLogs.filter(l => l.instructorName === instructorFilter);
+        }
+
+        // Apply Session Filter
+        if (sessionFilter !== 'all') {
+            allLogs = allLogs.filter(l => l.session.toUpperCase().startsWith(sessionFilter));
+        }
+
+        // Sort by Date
+        const sortedLogs = allLogs.sort((a, b) => {
+            const timeA = new Date(a.date || 0).getTime();
+            const timeB = new Date(b.date || 0).getTime();
+            return dateSort === 'desc' ? timeB - timeA : timeA - timeB;
+        });
 
         setTotalPages(Math.ceil(sortedLogs.length / ITEMS_PER_PAGE));
 
@@ -74,15 +115,7 @@ export function Dashboard() {
         setRecentLogs(sortedLogs.slice(start, end));
     };
 
-    const handleValidate = (id: string, status: 'validated' | 'rejected') => {
-        if (status === 'rejected') {
-            const feedback = prompt("¿Por qué no coincide esta sesión? (Opcional)");
-            storageService.validateFlight(id, status, feedback || undefined);
-        } else {
-            storageService.validateFlight(id, status);
-        }
-        loadData();
-    };
+
 
     const formatDuration = (minutes: number) => {
         return (minutes / 60).toFixed(1).replace('.', ',');
@@ -154,6 +187,55 @@ export function Dashboard() {
             )}
 
             <div className="space-y-4">
+                {isStudent && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                            {/* Instructor Filter */}
+                            <Select
+                                value={instructorFilter}
+                                onChange={(e) => setInstructorFilter(e.target.value)}
+                                options={[
+                                    { value: 'all', label: 'Todos los instructores' },
+                                    ...availableInstructors.map(inst => ({ value: inst, label: inst }))
+                                ]}
+                            />
+
+                            {/* Session Filter */}
+                            <Select
+                                value={sessionFilter}
+                                onChange={(e) => setSessionFilter(e.target.value as any)}
+                                options={[
+                                    { value: 'all', label: 'Todas las sesiones' },
+                                    { value: 'VBAS', label: 'VBAS' },
+                                    { value: 'VRAD', label: 'VRAD' },
+                                    { value: 'VPRA', label: 'VPRA' }
+                                ]}
+                            />
+
+                            {/* Status Filter */}
+                            <Select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value as any)}
+                                options={[
+                                    { value: 'all', label: 'Todos los estados' },
+                                    { value: 'pending', label: 'Pendientes' },
+                                    { value: 'validated', label: 'Validados' },
+                                    { value: 'rejected', label: 'Discrepancias' }
+                                ]}
+                            />
+
+                            {/* Date Sort */}
+                            <Select
+                                value={dateSort}
+                                onChange={(e) => setDateSort(e.target.value as any)}
+                                options={[
+                                    { value: 'desc', label: 'Más recientes primero' },
+                                    { value: 'asc', label: 'Más antiguos primero' }
+                                ]}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="flex items-center gap-2 mb-4">
@@ -223,7 +305,11 @@ export function Dashboard() {
                                         {isPending && isStudent && <span className="text-xs font-bold text-orange-600 animate-pulse">Pendiente Validar</span>}
 
                                         {/* Grade Display Logic */}
-                                        {isNoEvaluable ? (
+                                        {isPending ? (
+                                            <span className="text-xs font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700">
+                                                ---
+                                            </span>
+                                        ) : isNoEvaluable ? (
                                             <span className="text-xs font-bold text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
                                                 {log.grade}
                                             </span>
@@ -258,21 +344,11 @@ export function Dashboard() {
                                         )}
                                     </div>
                                 </div>
-                                {/* Validation Actions for Student */}
-                                {isStudent && isPending && (
-                                    <div className="p-3 pt-0 flex gap-2 justify-end">
-                                        <button
-                                            onClick={() => handleValidate(log.id, 'rejected')}
-                                            className="text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 px-3 py-2 rounded transition-colors flex items-center gap-1"
-                                        >
-                                            <X className="h-4 w-4" /> No coincide
-                                        </button>
-                                        <button
-                                            onClick={() => handleValidate(log.id, 'validated')}
-                                            className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded shadow-sm transition-colors flex items-center gap-1"
-                                        >
-                                            <Check className="h-4 w-4" /> Validar
-                                        </button>
+                                {isRejected && log.studentFeedback && (
+                                    <div className="px-4 pb-4">
+                                        <div className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm p-3 rounded-md">
+                                            <strong>Motivo rechazo:</strong> {log.studentFeedback}
+                                        </div>
                                     </div>
                                 )}
                             </Card>

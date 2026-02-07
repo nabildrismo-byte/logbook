@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
+import { Button } from '@/components/ui/Button'
 import { storageService } from '@/services/storage'
 import { authService } from '@/services/auth'
 import { FlightLog } from '@/types'
 import { format } from 'date-fns'
-import { CheckCircle2, XCircle, Clock, Check, X, AlertCircle } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, Check, X, AlertCircle, ShieldCheck } from 'lucide-react'
 
 
 export function StudentDetail() {
@@ -15,6 +16,7 @@ export function StudentDetail() {
     const [logs, setLogs] = useState<FlightLog[]>([]);
     const [sessionFilter, setSessionFilter] = useState<'all' | 'VBAS' | 'VRAD' | 'VPRA'>('all');
     const [gradeFilter, setGradeFilter] = useState<'all' | 'apto' | 'no-apto' | 'no-evaluable'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'validated' | 'rejected'>('all');
     const user = authService.getCurrentUser();
 
     useEffect(() => {
@@ -25,7 +27,7 @@ export function StudentDetail() {
         if (name) {
             loadStudentData(name);
         }
-    }, [name, user, navigate]);
+    }, [name, user?.id, navigate]);
 
     const loadStudentData = (studentNameEncoded: string) => {
         let studentName = studentNameEncoded;
@@ -52,6 +54,22 @@ export function StudentDetail() {
     const formatDuration = (minutes: number) => {
         return (minutes / 60).toFixed(1).replace('.', ',');
     };
+
+    const [validationModal, setValidationModal] = useState<{
+        isOpen: boolean;
+        logId: string | null;
+        grade: string;
+        remarks: string;
+        studentName: string;
+    }>({
+        isOpen: false,
+        logId: null,
+        grade: '',
+        remarks: '',
+        studentName: ''
+    });
+
+
 
     if (!logs.length) {
         return (
@@ -107,8 +125,122 @@ export function StudentDetail() {
         }
     };
 
+
+
+    const openValidationModal = (log: FlightLog) => {
+        setValidationModal({
+            isOpen: true,
+            logId: log.id,
+            grade: '',
+            remarks: '',
+            studentName: log.studentName
+        });
+    };
+
+    const closeValidationModal = () => {
+        setValidationModal(prev => ({ ...prev, isOpen: false, logId: null }));
+    };
+
+    const handleConfirmValidation = async () => {
+        if (!validationModal.logId) return;
+        if (!validationModal.grade) {
+            alert('Debes introducir una calificación.');
+            return;
+        }
+
+        await storageService.validateFlight(
+            validationModal.logId,
+            'validated',
+            undefined, // no rejection feedback
+            validationModal.grade,
+            validationModal.remarks
+        );
+
+        closeValidationModal();
+        loadStudentData(name || '');
+    };
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative">
+            {/* VALIDATION MODAL OVERLAY */}
+            {validationModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <Card className="w-full max-w-md bg-white dark:bg-zinc-900 shadow-xl border-zinc-200 dark:border-zinc-800">
+                        <CardContent className="p-6 space-y-6">
+                            <h3 className="text-lg font-bold">Validar Vuelo</h3>
+
+                            {/* NO EVALUABLE TOGGLE */}
+                            <div className="flex items-center gap-2 mb-4">
+                                <input
+                                    type="checkbox"
+                                    id="no-evaluable"
+                                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    checked={validationModal.grade === 'NO EVALUABLE'}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setValidationModal(prev => ({ ...prev, grade: 'NO EVALUABLE' }));
+                                        } else {
+                                            setValidationModal(prev => ({ ...prev, grade: '5' }));
+                                        }
+                                    }}
+                                />
+                                <label htmlFor="no-evaluable" className="text-sm font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
+                                    Marcar como NO EVALUABLE
+                                </label>
+                            </div>
+
+                            {validationModal.grade !== 'NO EVALUABLE' && (
+                                <div className="space-y-4">
+                                    <div className="text-center">
+                                        <div className={`text-5xl font-bold font-mono transition-colors ${!validationModal.grade ? 'text-zinc-300' : parseFloat(validationModal.grade) < 5 ? 'text-red-500' : 'text-blue-600'
+                                            }`}>
+                                            {validationModal.grade || '0'}
+                                        </div>
+                                        <div className="text-sm font-medium text-zinc-400 mt-1">
+                                            {validationModal.grade ? (parseFloat(validationModal.grade) < 5 ? 'NO APTO' : 'APTO') : 'Selecciona nota'}
+                                        </div>
+                                    </div>
+
+                                    <div className="px-2 pb-2">
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="10"
+                                            step="0.5"
+                                            value={parseFloat(validationModal.grade) || 0}
+                                            onChange={(e) => setValidationModal(prev => ({ ...prev, grade: e.target.value }))}
+                                            className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-blue-600"
+                                        />
+                                        <div className="flex justify-between text-xs text-zinc-400 mt-2 font-mono">
+                                            <span>0</span>
+                                            <span>5</span>
+                                            <span>10</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Observaciones (Feedback)</label>
+                                <textarea
+                                    className="w-full p-3 border rounded-md min-h-[100px] dark:bg-zinc-800 dark:border-zinc-700 text-sm"
+                                    placeholder="Comentarios"
+                                    value={validationModal.remarks}
+                                    onChange={(e) => setValidationModal(prev => ({ ...prev, remarks: e.target.value }))}
+                                />
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <Button variant="outline" onClick={closeValidationModal} className="flex-1">Cancelar</Button>
+                                <Button onClick={handleConfirmValidation} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold">
+                                    <Check className="mr-2 h-4 w-4" /> Confirmar
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
             <div className="flex flex-col gap-1">
                 <div className="flex justify-between items-start">
                     <div>
@@ -132,11 +264,11 @@ export function StudentDetail() {
                     </div>
                     <button
                         onClick={async () => {
-                            if (!confirm('¿Validar todos los vuelos pendientes de este alumno?')) return;
+                            if (!confirm('ATENCIÓN: La validación por lotes no asignará calificación. ¿Deseas continuar? Se asignará APTO por defecto.')) return;
                             const pendingIds = logs.filter(l => !l.validationStatus || l.validationStatus === 'pending').map(l => l.id);
 
                             for (const id of pendingIds) {
-                                await storageService.validateFlight(id, 'validated');
+                                await storageService.validateFlight(id, 'validated', undefined, 'APTO', 'Validación masiva');
                             }
                             // Reload
                             loadStudentData(name || '');
@@ -155,9 +287,14 @@ export function StudentDetail() {
                         <CardTitle className="text-xs font-semibold text-zinc-500">NOTA MEDIA</CardTitle>
                     </CardHeader>
                     <CardContent className="p-3 pt-0">
-                        <div className={`text-2xl font-bold ${avgGrade < 5 ? 'text-red-600' : 'text-green-600'}`}>
-                            {avgGrade.toFixed(1)}
-                        </div>
+                        {/* Hide Average Grade for Students */}
+                        {user?.role === 'student' ? (
+                            <div className="text-2xl font-bold text-zinc-400">---</div>
+                        ) : (
+                            <div className={`text-2xl font-bold ${avgGrade < 5 ? 'text-red-600' : 'text-green-600'}`}>
+                                {avgGrade.toFixed(1)}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
                 <Card className="bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/50">
@@ -282,17 +419,31 @@ export function StudentDetail() {
                         Histórico de Sesiones
                     </h3>
 
-                    <div className="w-full sm:w-40">
-                        <Select
-                            onChange={(e) => setSessionFilter(e.target.value as any)}
-                            value={sessionFilter}
-                            options={[
-                                { value: 'all', label: 'Todas' },
-                                { value: 'VBAS', label: 'VBAS' },
-                                { value: 'VRAD', label: 'VRAD' },
-                                { value: 'VPRA', label: 'VPRA' }
-                            ]}
-                        />
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        <div className="w-full sm:w-40">
+                            <Select
+                                onChange={(e) => setStatusFilter(e.target.value as any)}
+                                value={statusFilter}
+                                options={[
+                                    { value: 'all', label: 'Todos los estados' },
+                                    { value: 'pending', label: 'Pendientes' },
+                                    { value: 'validated', label: 'Validados' },
+                                    { value: 'rejected', label: 'Discrepancias' }
+                                ]}
+                            />
+                        </div>
+                        <div className="w-full sm:w-40">
+                            <Select
+                                onChange={(e) => setSessionFilter(e.target.value as any)}
+                                value={sessionFilter}
+                                options={[
+                                    { value: 'all', label: 'Todas las sesiones' },
+                                    { value: 'VBAS', label: 'VBAS' },
+                                    { value: 'VRAD', label: 'VRAD' },
+                                    { value: 'VPRA', label: 'VPRA' }
+                                ]}
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -305,10 +456,18 @@ export function StudentDetail() {
                         }
                         if (!sessionMatch) return false;
 
-                        // 2. Filter by Grade Status (Interactive Cards)
+                        // 2. Filter by Status (New)
+                        if (statusFilter !== 'all') {
+                            const status = log.validationStatus || 'pending';
+                            if (statusFilter === 'pending' && status !== 'pending') return false;
+                            if (statusFilter === 'validated' && status !== 'validated') return false;
+                            if (statusFilter === 'rejected' && status !== 'rejected') return false;
+                        }
+
+                        // 3. Filter by Grade Status (Interactive Cards)
                         if (gradeFilter === 'all') return true;
 
-                        const gradeUpper = log.grade.toUpperCase();
+                        const gradeUpper = log.grade?.toUpperCase() || '';
                         const isNoEval = gradeUpper.includes('NO EVALUABLE');
 
                         if (gradeFilter === 'no-evaluable') return isNoEval;
@@ -333,14 +492,20 @@ export function StudentDetail() {
                         const isValidated = log.validationStatus === 'validated';
                         const isRejected = log.validationStatus === 'rejected';
 
+                        // Handle missing grade for display logic
+                        const gradeDisplay = log.grade || '';
+                        const gradeUpper = gradeDisplay.toUpperCase();
+
                         return (
                             <div key={log.id} className="relative pl-6 pb-6 border-l border-zinc-200 dark:border-zinc-800 last:pb-0 last:border-l-0">
-                                {/* Visual indicator logic: Green (Pass), Red (Fail), Gray (No Evaluable) */}
-                                <div className={`absolute top-0 left-[-5px] h-2.5 w-2.5 rounded-full ${log.grade.toUpperCase().includes('NO EVALUABLE')
+                                {/* Visual indicator logic */}
+                                <div className={`absolute top-0 left-[-5px] h-2.5 w-2.5 rounded-full ${gradeUpper.includes('NO EVALUABLE')
                                     ? 'bg-zinc-400'
-                                    : (parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
-                                        ? 'bg-green-500'
-                                        : 'bg-red-500'
+                                    : !gradeDisplay
+                                        ? 'bg-zinc-300'
+                                        : (parseFloat(gradeDisplay) >= 5 || (gradeUpper.includes('APTO') && !gradeUpper.includes('NO')))
+                                            ? 'bg-green-500'
+                                            : 'bg-red-500'
                                     }`} />
                                 <Card className={isRejected ? 'border-red-300 dark:border-red-800' : ''}>
                                     <div className="absolute top-2 right-2">
@@ -366,14 +531,24 @@ export function StudentDetail() {
                                                 </div>
                                                 <div className="text-sm text-zinc-500"><span className="font-medium text-zinc-700 dark:text-zinc-300">{log.aircraft?.registration || 'N/A'}</span> • {log.instructorName}</div>
                                             </div>
-                                            <div className={`text-xl font-bold ${log.grade.toUpperCase().includes('NO EVALUABLE')
-                                                ? 'text-zinc-500'
-                                                : (parseFloat(log.grade) >= 5 || (log.grade.toUpperCase().includes('APTO') && !log.grade.toUpperCase().includes('NO')))
-                                                    ? 'text-green-600'
-                                                    : 'text-red-600'
-                                                }`}>
-                                                {log.grade}
-                                            </div>
+
+                                            {/* Hide Grade for Students */}
+                                            {user?.role === 'student' ? (
+                                                <div className="text-xl font-bold text-zinc-300">
+                                                    ***
+                                                </div>
+                                            ) : (
+                                                <div className={`text-xl font-bold ${gradeUpper.includes('NO EVALUABLE')
+                                                    ? 'text-zinc-500'
+                                                    : !gradeDisplay
+                                                        ? 'text-zinc-300'
+                                                        : (parseFloat(gradeDisplay) >= 5 || (gradeUpper.includes('APTO') && !gradeUpper.includes('NO')))
+                                                            ? 'text-green-600'
+                                                            : 'text-red-600'
+                                                    }`}>
+                                                    {gradeDisplay || '---'}
+                                                </div>
+                                            )}
                                         </div>
 
                                         {isRejected && log.studentFeedback && (
@@ -400,38 +575,40 @@ export function StudentDetail() {
                                                     {log.procedures ? (
                                                         <span><span className="font-semibold">Proc:</span> {log.procedures} </span>
                                                     ) : null}
-                                                    {log.remarks ? (
+                                                    {user?.role !== 'student' && log.remarks ? (
                                                         <span><span className="font-semibold">Obs:</span> {log.remarks}</span>
                                                     ) : null}
-                                                    {!log.procedures && !log.remarks && '-'}
+                                                    {!log.procedures && (!log.remarks || user?.role === 'student') && '-'}
                                                 </button>
                                             </div>
                                         </div>
                                     </CardContent>
-                                    {/* ADMIN ACTIONS FOOTER */}
-                                    {user?.role === 'admin' && isPending && (
+                                    {/* ACTIONS FOOTER */}
+                                    {/* Admin can always edit. Instructors can only validate their OWN flights that are PENDING. */}
+                                    {(user?.role === 'admin' || (user?.role === 'instructor' && isPending && log.instructorName === user.name)) && (
                                         <div className="border-t border-zinc-100 dark:border-zinc-800 mt-4 pt-3 flex gap-2">
                                             <button
-                                                onClick={async () => {
-                                                    await storageService.validateFlight(log.id, 'validated');
-                                                    loadStudentData(name || '');
-                                                }}
+                                                onClick={() => openValidationModal(log)}
                                                 className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300 px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1 transition-colors"
                                             >
-                                                <Check className="h-3 w-3" /> Validar
+                                                <ShieldCheck className="h-3 w-3" /> {user?.role === 'admin' && isValidated ? 'Editar Nota' : 'Validar'}
                                             </button>
-                                            <button
-                                                onClick={async () => {
-                                                    const reason = prompt('Motivo del rechazo:');
-                                                    if (reason) {
-                                                        await storageService.validateFlight(log.id, 'rejected', reason);
-                                                        loadStudentData(name || '');
-                                                    }
-                                                }}
-                                                className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300 px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1 transition-colors"
-                                            >
-                                                <X className="h-3 w-3" /> Rechazar
-                                            </button>
+
+                                            {/* Only show Reject if not already rejected, or if Admin */}
+                                            {(user?.role === 'admin' || !isRejected) && (
+                                                <button
+                                                    onClick={async () => {
+                                                        const reason = prompt('Motivo del rechazo:');
+                                                        if (reason) {
+                                                            await storageService.validateFlight(log.id, 'rejected', reason);
+                                                            loadStudentData(name || '');
+                                                        }
+                                                    }}
+                                                    className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300 px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                                                >
+                                                    <X className="h-3 w-3" /> {isRejected ? 'Cambiar motivo' : 'Rechazar'}
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </Card>

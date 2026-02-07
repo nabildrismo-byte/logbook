@@ -31,7 +31,7 @@ export const storageService = {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newLogs));
     },
 
-    validateFlight: async (id: string, status: 'validated' | 'rejected', feedback?: string): Promise<void> => {
+    validateFlight: async (id: string, status: 'validated' | 'rejected', feedback?: string, grade?: string, remarks?: string): Promise<void> => {
         const logs = storageService.getLogs();
         const existingIndex = logs.findIndex(l => l.id === id);
 
@@ -39,9 +39,10 @@ export const storageService = {
             // 1. Update Local
             const log = logs[existingIndex];
             log.validationStatus = status;
-            if (feedback) {
-                log.studentFeedback = feedback;
-            }
+            if (feedback) log.studentFeedback = feedback;
+            if (grade) log.grade = grade;
+            if (remarks) log.remarks = remarks;
+
             localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
 
             // 2. Send to Cloud (Fire and Forget)
@@ -56,6 +57,8 @@ export const storageService = {
                 formData.append('flightId', compositeId);
                 formData.append('status', status);
                 if (feedback) formData.append('feedback', feedback);
+                if (grade) formData.append('grade', grade);
+                if (remarks) formData.append('remarks', remarks);
 
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
@@ -130,9 +133,13 @@ export const storageService = {
             if (Array.isArray(validations)) {
                 validations.forEach(v => {
                     const key = v['ID_VUELO'];
-                    // If overwrite logic needed, we could sort by timestamp. 
-                    // Using the latest one encountered (or we could sort validations array first)
-                    validationMap.set(key, { status: v['ESTADO'], feedback: v['FEEDBACK'] });
+                    // Store extra fields: NOTA, OBS_VALIDACION
+                    validationMap.set(key, {
+                        status: v['ESTADO'],
+                        feedback: v['FEEDBACK'],
+                        grade: v['NOTA'],
+                        remarks: v['OBS_VALIDACION']
+                    });
                 });
             }
 
@@ -147,11 +154,14 @@ export const storageService = {
                         const [d, m, y] = rawDate.split('/');
                         isoDate = `${y}-${m}-${d}`;
                     } else if (typeof rawDate === 'string') {
-                        // Try parsing formatted ISO string or other string format
+                        // FIX: Use Local Time instead of UTC (toISOString) to avoid timezone shift
                         try {
                             const dateObj = new Date(rawDate);
                             if (!isNaN(dateObj.getTime())) {
-                                isoDate = dateObj.toISOString().split('T')[0];
+                                const y = dateObj.getFullYear();
+                                const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                                const d = String(dateObj.getDate()).padStart(2, '0');
+                                isoDate = `${y}-${m}-${d}`;
                             }
                         } catch (e) { console.error('Date parse error', e) }
                     }
@@ -201,6 +211,15 @@ export const storageService = {
                 // The previous fix was "preserve local". 
                 // Now that we have cloud sync, "Cloud wins" is safer IF the cloud has data.
 
+                // Priority Logic for Grade/Remarks
+                let finalGrade = String(row['PUNTUACIÓN'] || '');
+                let finalRemarks = row['OBSERVACIONES'] || '';
+
+                if (cloudVal && cloudVal.status === 'validated') {
+                    if (cloudVal.grade && cloudVal.grade !== 'undefined') finalGrade = String(cloudVal.grade);
+                    if (cloudVal.remarks && cloudVal.remarks !== 'undefined') finalRemarks = cloudVal.remarks;
+                }
+
                 const existingLog = storageService.getLogs().find(l =>
                     l.date === isoDate &&
                     l.studentName === (row['ALUMNO'] || '') &&
@@ -215,7 +234,7 @@ export const storageService = {
                     studentName: row['ALUMNO'] || '',
                     flightType: fType,
                     session: row['SESIÓN'] || '',
-                    grade: String(row['PUNTUACIÓN'] || ''), // Force String to avoid .toUpperCase() crash on numbers
+                    grade: finalGrade, // Updated Logic
                     aircraft: {
                         registration: row['MATRÍCULA'] || '',
                         type: 'Heli'
@@ -233,7 +252,7 @@ export const storageService = {
                     conditions: {},
                     approaches: approaches,
                     procedures: row['PROCEDIMIENTOS'] || '',
-                    remarks: row['OBSERVACIONES'] || '',
+                    remarks: finalRemarks, // Updated Logic
                     // Validation Logic: Cloud is source of truth. If missing in cloud, it means it is pending.
                     validationStatus: cloudVal?.status,
                     studentFeedback: cloudVal?.feedback
